@@ -1,10 +1,3 @@
-"""
-Grupos de rotas:
-  /auth        → login, geração de token
-  /admin       → criar clientes, gerenciar versões (só você, via X-Admin-Key)
-  /agent       → endpoints que o agente local consome
-  /panel       → endpoints que o painel web consome
-"""
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -38,6 +31,9 @@ from auth import (
     ADMIN_KEY
 )
 from notifier import send_error_email, send_error_webhook, send_resolved_email
+
+from evolution import get_qrcode, get_status, criar_instancia
+from scheduler import scheduler, agendar_task, cancelar_task
 
 # ── app ───────────────────────────────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO)
@@ -401,6 +397,28 @@ async def report_error(
 
     return {"ok": True, "error_id": error.id}
 
+@app.on_event("startup")
+async def startup():
+    init_db()
+    scheduler.start()
+    try:
+        await criar_instancia()
+        logger.info("✅ Instância Evolution verificada")
+    except Exception as e:
+        logger.warning(f"⚠️  Evolution não disponível no startup: {e}")
+
+@app.on_event("shutdown")
+async def shutdown():
+    scheduler.shutdown(wait=False)
+
+# ── QR Code ───────────────────────────────────────────────────────────────────
+@app.get("/panel/qrcode", tags=["panel"])
+async def qrcode(client=Depends(get_current_client)):
+    return await get_qrcode()
+
+@app.get("/panel/status", tags=["panel"])
+async def status_wa(client=Depends(get_current_client)):
+    return await get_status()
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  PANEL — consumido pelo painel web
@@ -430,7 +448,46 @@ def create_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+
+    # agenda imediatamente após salvar
+    agendar_task(task.id, task.scheduled_time, task.is_daily, task.include_weekends)
     return task
+
+
+
+
+# ── CORREÇÃO: send-now executa imediatamente via scheduler ───────────────────
+@app.post("/panel/send-now", tags=["panel"])
+async def send_now(
+    payload: SendNowRequest,
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+):
+    import datetime as dt_mod
+
+    now_utc = dt_mod.datetime.now(dt_mod.timezone.utc)
+
+    task = Task(
+        client_id=client.id,
+        task_name=f"immediate_{client.id}_{int(now_utc.timestamp())}",
+        target=payload.target,
+        mode=payload.mode,
+        message=payload.message,
+        file_path=payload.file_path,
+        scheduled_time=now_utc,
+        is_daily=False,
+        status=TaskStatus.pending,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    # agenda para daqui a 2s — dá tempo do commit propagar
+    run_at = now_utc + dt_mod.timedelta(seconds=2)
+    agendar_task(task.id, run_at, is_daily=False)
+
+    return {"ok": True, "task_id": task.id, "message": "Enviando agora..."}
+
 
     agendar_task(task.id, task.scheduled_time, task.is_daily)
 
@@ -459,6 +516,24 @@ def update_task(
     db.refresh(task)
     return task
 
+# ── CORREÇÃO: delete cancela o job ANTES do return ───────────────────────────
+@app.delete("/panel/tasks/{task_id}", tags=["panel"])
+def delete_task(
+    task_id: int,
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+):
+    task = db.query(Task).filter(
+        Task.id == task_id,
+        Task.client_id == client.id
+    ).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task não encontrada")
+    cancelar_task(task_id)   # remove do scheduler primeiro
+    db.delete(task)
+    db.commit()
+    return {"ok": True}
+
 @app.patch("/panel/tasks/{task_id}/status", tags=["panel"])
 def panel_update_task_status(
     task_id: int,
@@ -477,23 +552,6 @@ def panel_update_task_status(
     db.commit()
     return {"ok": True}
 
-@app.delete("/panel/tasks/{task_id}", tags=["panel"])
-def delete_task(
-    task_id: int,
-    client: Client = Depends(get_current_client),
-    db: Session = Depends(get_db),
-):
-    task = db.query(Task).filter(
-        Task.id == task_id,
-        Task.client_id == client.id
-    ).first()
-    if not task:
-        raise HTTPException(status_code=404, detail="Task não encontrada")
-    db.delete(task)
-    db.commit()
-    return {"ok": True}
-
-    cancelar_task(task_id)
 
 
 @app.get("/panel/errors", response_model=List[ErrorReportOut], tags=["panel"])

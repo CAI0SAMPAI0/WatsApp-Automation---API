@@ -1,43 +1,42 @@
 services:
   evolution-api:
     container_name: evolution_api
-    image: evoapicloud/evolution-api:latest
+    image: atendai/evolution-api:v2.3.7
     restart: always
     ports:
       - "8080:8080"
-    env_file:
-      - .env
     environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: SUA_CHAVE_AQUI
+
       DATABASE_PROVIDER: postgresql
-      DB_PROVIDER: postgresql
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/evolution
-      DATABASE_CONNECTION_URI: postgresql://postgres:postgres@postgres:5432/evolution?sslmode=disable
-      DATABASE_HOST: postgres
-      DATABASE_PORT: "5432"
-      DATABASE_USERNAME: postgres
-      DATABASE_PASSWORD: postgres
-      DATABASE_NAME: evolution
-      REDIS_ENABLED: "true"
-      REDIS_URI: redis://redis:6379
-      REDIS_PREFIX_KEY: evolution_bot
-      SERVER_URL: http://evolution_api:8080
-    volumes:
-      - evolution_instances:/evolution/instances
+      DATABASE_CONNECTION_URI: postgresql://postgres:postgres123@postgres:5432/evolution
+
+      # Redis — v2 usa CACHE_REDIS_*, não REDIS_*
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://redis:6379
+      CACHE_REDIS_PREFIX_KEY: evolution_bot
+      CACHE_REDIS_SAVE_INSTANCES: "false"
+
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - bot_network
 
   postgres:
     container_name: postgres
-    image: postgres:15
-    command: ["postgres", "-c", "max_connections=1000"]
+    image: postgres:15-alpine
     restart: always
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: postgres123
       POSTGRES_DB: evolution
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -46,11 +45,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - bot_network
 
   redis:
-    image: redis:latest
     container_name: redis
-    command: redis-server --port 6379 --appendonly yes
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
@@ -60,30 +62,36 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - bot_network
 
   bot:
     build: ./backend
     container_name: bot
+    restart: always
     ports:
       - "8000:8000"
-    env_file:
-      - .env
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/evolution
+      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/evolution
       REDIS_URL: redis://redis:6379
       EVOLUTION_URL: http://evolution_api:8080
-      SERVER_URL: http://evolution_api:8080
+      EVOLUTION_INSTANCE: minha-instancia
+      EVOLUTION_KEY: SUA_CHAVE_AQUI
+      JWT_SECRET_KEY: troque-isso
+      ADMIN_API_KEY: admin123
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       evolution-api:
         condition: service_started
-    restart: always
-    volumes:
-      - ./vectorstore_data:/app/vectorstore
-      - ./rag_files:/app/rag_files
+    networks:
+      - bot_network
+
+networks:
+  bot_network:
+    driver: bridge
 
 volumes:
   evolution_instances:

@@ -152,7 +152,8 @@ async function apiObterAgendamento(taskId) {
     const task = t.find(x => x.id === taskId);
     if (!task) return { error: "Não encontrado" };
 
-    const dt = new Date(task.scheduled_time);
+    const isoUtc = task.scheduled_time.endsWith("Z") ? task.scheduled_time : task.scheduled_time + "Z";
+    const dt = new Date(isoUtc);
     task.date_str = `${pad(dt.getDate())}/${pad(dt.getMonth() + 1)}/${dt.getFullYear()}`;
     task.time_str = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
     return { agendamento: task };
@@ -289,7 +290,9 @@ function pad(n) { return String(n).padStart(2, "0"); }
 
 function formatDatetime(iso) {
     if (!iso) return "";
-    const d = new Date(iso);
+    // garante que o browser interpreta como UTC adicionando Z se necessário
+    const isoUtc = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+    const d = new Date(isoUtc);
     return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
@@ -297,12 +300,15 @@ function parseDateTime(dateStr, timeStr, isDaily) {
     try {
         if (isDaily) {
             const [h, m] = timeStr.split(":").map(Number);
+            // para diário, manda a hora como se fosse hoje no horário local
             const d = new Date();
             d.setHours(h, m, 0, 0);
-            return d;
+            return d;  // toISOString() vai converter para UTC corretamente
         }
         const [day, month, year] = dateStr.split("/").map(Number);
         const [h, m] = timeStr.split(":").map(Number);
+        // new Date(year, month-1, day, h, m) cria em horário LOCAL do browser
+        // toISOString() converte para UTC — o backend recebe UTC e agenda certo
         return new Date(year, month - 1, day, h, m, 0);
     } catch {
         return null;
