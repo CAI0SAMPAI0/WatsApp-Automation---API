@@ -1,6 +1,7 @@
 backend/.env
 venv/
 .vscode/
+.env
 
 # Cache Python
 __pycache__/

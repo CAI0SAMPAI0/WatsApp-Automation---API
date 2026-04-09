@@ -19,6 +19,9 @@ import enum
 # ── conexão ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
+if not DATABASE_URL or DATABASE_URL == "":
+    raise ValueError("DATABASE_URL não foi configurada! Verifique o arquivo .env")
+
 # Railway entrega URLs no formato postgres://, SQLAlchemy 1.4+ exige postgresql://
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)

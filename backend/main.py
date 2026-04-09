@@ -14,8 +14,10 @@ from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Header, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
+import os as os_module
 
 from database import (
     init_db, get_db,
@@ -67,12 +69,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.on_event("startup")
-def startup():
-    init_db()
-    logger.info("✅ Banco de dados inicializado")
-
+# ── Servir arquivos estáticos (HTML/CSS/JS) ─────────────────────────────────
+ui_path = os_module.path.join(os_module.path.dirname(__file__), "..", "ui", "web")
+if os_module.path.exists(ui_path):
+    app.mount("/", StaticFiles(directory=ui_path, html=True), name="static")
+    logger.info(f"✅ UI estática montada em /manage → {ui_path}")
+else:
+    logger.warning(f"⚠️  Pasta UI não encontrada: {ui_path}")
 
 # ── helper: verificar admin key ───────────────────────────────────────────────
 def check_admin(x_admin_key: str = Header(None)):
@@ -589,8 +592,16 @@ from scheduler import scheduler, agendar_task, cancelar_task
 
 @app.on_event("startup")
 async def startup():
-    init_db()
-    scheduler.start()
+    try:
+        init_db()
+    except Exception as e:
+        logger.warning(f"⚠️  Banco de dados não disponível no startup: {e}")
+    
+    try:
+        scheduler.start()
+    except Exception as e:
+        logger.warning(f"⚠️  Scheduler não pode iniciar: {e}")
+    
     # garante que a instância existe
     try:
         await criar_instancia()
