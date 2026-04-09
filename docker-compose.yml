@@ -1,0 +1,66 @@
+version: "3.9"
+
+services:
+  evolution:
+    image: atendai/evolution-api:v1.7.0
+    container_name: evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SERVER_URL: http://localhost:8080
+      AUTHENTICATION_TYPE: apikey
+      AUTHENTICATION_API_KEY: SUA_CHAVE_AQUI
+      DATABASE_ENABLED: "true"
+      DATABASE_CONNECTION_URI: postgresql://postgres:senha@postgres:5432/evolution
+      DATABASE_CONNECTION_CLIENT_NAME: evolution
+      REDIS_ENABLED: "true"
+      REDIS_URI: redis://redis:6379
+      REDIS_PREFIX_KEY: evolution
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: senha
+      POSTGRES_DB: whatsapp_bot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  backend:
+    build: ./backend
+    container_name: fastapi_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:senha@postgres:5432/whatsapp_bot
+      REDIS_URL: redis://redis:6379
+      EVOLUTION_URL: http://evolution:8080
+      EVOLUTION_KEY: SUA_CHAVE_AQUI
+      JWT_SECRET_KEY: troque-isso
+      ADMIN_API_KEY: admin123
+    depends_on:
+      - postgres
+      - redis
+      - evolution
+
+volumes:
+  pgdata:
+  redisdata:

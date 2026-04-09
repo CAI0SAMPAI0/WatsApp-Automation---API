@@ -28,7 +28,7 @@ from schemas import (
     TaskCreate, TaskUpdate, TaskStatusUpdate, TaskOut, PendingTasksResponse,
     ErrorReportCreate, ErrorReportOut,
     AgentVersionCreate, AgentVersionOut,
-    DashboardStats,
+    DashboardStats, SendNowRequest
 )
 from auth import (
     generate_secret_key, hash_secret, verify_secret,
@@ -429,6 +429,8 @@ def create_task(
     db.refresh(task)
     return task
 
+    agendar_task(task.id, task.scheduled_time, task.is_daily)
+
 
 @app.put("/panel/tasks/{task_id}", response_model=TaskOut, tags=["panel"])
 def update_task(
@@ -488,6 +490,8 @@ def delete_task(
     db.commit()
     return {"ok": True}
 
+    cancelar_task(task_id)
+
 
 @app.get("/panel/errors", response_model=List[ErrorReportOut], tags=["panel"])
 def list_my_errors(
@@ -540,8 +544,76 @@ def my_stats(
         failed=failed, unresolved_errors=errors
     )
 
+@app.post("/panel/send-now", tags=["panel"])
+def send_now(
+    payload: SendNowRequest,
+    background_tasks: BackgroundTasks,
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+):
+    """
+    Cria uma task com scheduled_time = agora + 5s e status 'pending'.
+    O agente a detecta no próximo ciclo (até 60s, mas normalmente <10s).
+    
+    DIFERENÇA do /panel/tasks normal:
+      - scheduled_time é sempre NOW, não escolhido pelo usuário
+      - O frontend trata como "envio imediato"
+      - A task some do histórico após execução (is_immediate=True)
+    """
+    import datetime
+    
+    task = Task(
+        client_id=client.id,
+        task_name=f"immediate_{client.id}_{int(datetime.datetime.utcnow().timestamp())}",
+        target=payload.target,
+        mode=payload.mode,
+        message=payload.message,
+        file_path=payload.file_path,
+        scheduled_time=datetime.datetime.utcnow(),   # agora
+        is_daily=False,
+        status=TaskStatus.pending,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    
+    return {"ok": True, "task_id": task.id, "message": "Enviando em breve (próximo ciclo do agente)"}
 
 # ── healthcheck ───────────────────────────────────────────────────────────────
 @app.get("/health", tags=["infra"])
 def health():
     return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+
+from evolution import get_qrcode, get_status, criar_instancia
+from scheduler import scheduler, agendar_task, cancelar_task
+
+@app.on_event("startup")
+async def startup():
+    init_db()
+    scheduler.start()
+    # garante que a instância existe
+    try:
+        await criar_instancia()
+    except Exception:
+        pass   # já existe, normal
+
+@app.on_event("shutdown")
+async def shutdown():
+    scheduler.shutdown()
+
+# ── QR Code para conectar WhatsApp ──────────────
+@app.get("/panel/qrcode", tags=["panel"])
+async def qrcode(client=Depends(get_current_client)):
+    return await get_qrcode()
+
+@app.get("/panel/status", tags=["panel"])
+async def status_wa(client=Depends(get_current_client)):
+    return await get_status()
+
+# ── ao criar task, agenda no APScheduler ────────
+# (adicione ao final do seu POST /panel/tasks existente)
+# 
+
+# ── ao deletar task, cancela o job ──────────────
+# (adicione ao DELETE /panel/tasks/{task_id})
+# cancelar_task(task_id)

@@ -197,15 +197,14 @@ async function apiExcluirAgendamento(taskId) {
 
 async function apiEnviarAgora(dados) {
     // envio imediato: cria task com scheduled_time = agora
-    const r = await POST("/panel/tasks", {
+    const r = await POST("/panel/send-now", {
         target: dados.target,
         mode: dados.mode,
         message: dados.message || null,
         file_path: dados.file_path || null,
-        scheduled_time: new Date().toISOString(),
-        is_daily: false,
     });
-    if (!r) return { error: "Falha ao criar task" };
+
+    if (!r) return { error: "Falha ao enviar" };
 
     // simula o callback que o pywebview usava
     // o agente vai pegar e executar no próximo ciclo (até 60s)
@@ -213,10 +212,9 @@ async function apiEnviarAgora(dados) {
         if (window.__onEnvioResult) {
             window.__onEnvioResult({ ok: true });
         }
-    }, 2000);
+    }, 500);
 
-    toast("Task criada! O agente vai executar em até 60s.", "info");
-    return { ok: true };
+    return { ok: true, msg: r.message || "Enviado!" };
 }
 
 async function apiReenviarAgendamento(taskId) {

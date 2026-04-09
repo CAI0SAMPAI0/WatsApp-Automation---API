@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr
 from database import SendMode, TaskStatus
-
+from fastapi import FastAPI
 
 # ══════════════════════════════════════════
 #  AUTH
@@ -163,3 +163,46 @@ class PendingTasksResponse(BaseModel):
     Retorna apenas as tasks que ele deve executar agora.
     """
     tasks: List[TaskOut]
+
+class SendNowRequest(BaseModel):
+    target:    str
+    mode:      SendMode
+    message:   Optional[str] = None
+    file_path: Optional[str] = None
+
+from main import app
+
+@app.post("/panel/send-now", tags=["panel"])
+def send_now(
+    payload: SendNowRequest,
+    background_tasks: BackgroundTasks,
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+):
+    """
+    Cria uma task com scheduled_time = agora + 5s e status 'pending'.
+    O agente a detecta no próximo ciclo (até 60s, mas normalmente <10s).
+    
+    DIFERENÇA do /panel/tasks normal:
+      - scheduled_time é sempre NOW, não escolhido pelo usuário
+      - O frontend trata como "envio imediato"
+      - A task some do histórico após execução (is_immediate=True)
+    """
+    import datetime
+    
+    task = Task(
+        client_id=client.id,
+        task_name=f"immediate_{client.id}_{int(datetime.datetime.utcnow().timestamp())}",
+        target=payload.target,
+        mode=payload.mode,
+        message=payload.message,
+        file_path=payload.file_path,
+        scheduled_time=datetime.datetime.utcnow(),   # agora
+        is_daily=False,
+        status=TaskStatus.pending,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    
+    return {"ok": True, "task_id": task.id, "message": "Enviando em breve (próximo ciclo do agente)"}
