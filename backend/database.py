@@ -1,9 +1,3 @@
-"""
-database.py — Modelos SQLAlchemy + conexão PostgreSQL
-
-O DATABASE_URL vem da variável de ambiente que o Railway injeta
-automaticamente quando você adiciona um Postgres ao projeto.
-"""
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -16,26 +10,19 @@ from sqlalchemy import (
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 import enum
 
-# ── conexão ──────────────────────────────────────────────────────────────────
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL não configurada!")
+    raise ValueError("DATABASE_URL nao configurada!")
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-# Força client_encoding=utf8 para evitar UnicodeDecodeError no Windows
-connect_args = {}
-if "postgresql" in DATABASE_URL:
-    connect_args = {"client_encoding": "utf8"}
 
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
-    connect_args=connect_args,
 )
 
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)

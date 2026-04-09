@@ -1,33 +1,21 @@
+version: '3.9'
+
 services:
   evolution-api:
     container_name: evolution_api
-    image: atendai/evolution-api:v2.3.7
+    image: atendai/evolution-api:v2.1.1
     restart: always
     ports:
       - "8080:8080"
-    environment:
-      SERVER_URL: http://localhost:8080
-      AUTHENTICATION_TYPE: apikey
-      AUTHENTICATION_API_KEY: SUA_CHAVE_AQUI
-
-      DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://postgres:postgres123@postgres:5432/evolution
-
-      # Redis — v2 usa CACHE_REDIS_*, não REDIS_*
-      CACHE_REDIS_ENABLED: "true"
-      CACHE_REDIS_URI: redis://redis:6379
-      CACHE_REDIS_PREFIX_KEY: evolution_bot
-      CACHE_REDIS_SAVE_INSTANCES: "false"
-
+    env_file:
+      - .env
+    volumes:
+      - evolution_instances:/evolution/instances
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - evolution_instances:/evolution/instances
-    networks:
-      - bot_network
 
   postgres:
     container_name: postgres
@@ -36,7 +24,8 @@ services:
     ports:
       - "5432:5432"
     environment:
-      POSTGRES_PASSWORD: postgres123
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: evolution
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -45,8 +34,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - bot_network
 
   redis:
     container_name: redis
@@ -56,44 +43,14 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis:/data
+      - redis_data:/data
     healthcheck:
       test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - bot_network
-
-  bot:
-    build: ./backend
-    container_name: bot
-    restart: always
-    ports:
-      - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres123@postgres:5432/evolution
-      REDIS_URL: redis://redis:6379
-      EVOLUTION_URL: http://evolution_api:8080
-      EVOLUTION_INSTANCE: minha-instancia
-      EVOLUTION_KEY: SUA_CHAVE_AQUI
-      JWT_SECRET_KEY: troque-isso
-      ADMIN_API_KEY: admin123
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      evolution-api:
-        condition: service_started
-    networks:
-      - bot_network
-
-networks:
-  bot_network:
-    driver: bridge
 
 volumes:
   evolution_instances:
   postgres_data:
-  redis:
+  redis_data:
