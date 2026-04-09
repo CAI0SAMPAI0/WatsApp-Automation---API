@@ -245,8 +245,11 @@ def execute_task(task: dict):
 
     page = None
     try:
-        from core.automation import executar_envio
-        executar_envio(
+        import asyncio
+        from core.automation_async import executar_envio
+        
+        # Roda a função async em um novo event loop
+        asyncio.run(executar_envio(
             userdir=profile_dir,
             target=target,
             mode=mode,
@@ -254,7 +257,7 @@ def execute_task(task: dict):
             file_path=file_path,
             logger=logger,
             modo_execucao="auto",
-        )
+        ))
 
         # sucesso
         api_patch(f"/agent/tasks/{task_id}/status", {"status": "completed"})

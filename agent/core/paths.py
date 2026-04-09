@@ -22,6 +22,7 @@ def get_user_data_dir():
     os.makedirs(path, exist_ok=True)
     return path
 
+
 def get_whatsapp_profile_dir(modo='gui'):
     """
     Retorna perfil SEPARADO para GUI e agendador.
@@ -53,4 +54,17 @@ def get_chrome_path():
     for c in caminhos:
         if os.path.exists(c):
             return c
-    raise FileNotFoundError("Chrome/Edge não encontrado no sistema")
+    
+    # Não encontrou → instala Chromium do Playwright
+    print("⚠️ Chrome/Edge não encontrado. Instalando Chromium do Playwright...")
+    import subprocess
+
+    try:
+        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], 
+                      check=True, capture_output=True)
+        print("✅ Chromium instalado com sucesso!")
+        
+        # Retorna None para usar o chromium padrão do Playwright
+        return None
+    except Exception as e:
+        raise FileNotFoundError(f"Falha ao instalar Chromium: {e}")

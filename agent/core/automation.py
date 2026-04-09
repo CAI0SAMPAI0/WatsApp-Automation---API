@@ -50,6 +50,9 @@ def contador_execucao(incrementar=True):
     return count
 
 def iniciar_driver(userdir, modo_execucao='manual', logger=None):
+    import nest_asyncio
+    nest_asyncio.apply()  # Permite sync playwright em loop async
+    
     from playwright.sync_api import sync_playwright
     import psutil
     userdir = os.path.abspath(userdir)
@@ -98,17 +101,22 @@ def iniciar_driver(userdir, modo_execucao='manual', logger=None):
     ultimo_erro = None
     for tentativa in range(1, 4):
         try:
-            browser_context = pw.chromium.launch_persistent_context(
-                executable_path=str(chromium_path),
-                user_data_dir=userdir, 
-                headless=False, 
-                args=browser_args, 
-                locale="pt-BR", 
-                timezone_id="America/Sao_Paulo",
-                viewport=None, 
-                no_viewport=True,
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
-            )
+            # Se chromium_path é None, usa o navegador padrão do Playwright
+            launch_kwargs = {
+                "user_data_dir": userdir,
+                "headless": False,
+                "args": browser_args,
+                "locale": "pt-BR",
+                "timezone_id": "America/Sao_Paulo",
+                "viewport": None,
+                "no_viewport": True,
+                "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+            }
+            
+            if chromium_path:
+                launch_kwargs["executable_path"] = str(chromium_path)
+            
+            browser_context = pw.chromium.launch_persistent_context(**launch_kwargs)
             # chegou aqui → sucesso
             break
         except Exception as e:

@@ -104,3 +104,80 @@ Traceback (most recent call last):
     from agent.core.paths import get_chrome_path
 ModuleNotFoundError: No module named 'agent.core'; 'agent' is not a package
 
+[2026-04-09 08:35:07,030] [INFO] ── Ciclo 41 ──────────────────────
+[2026-04-09 08:36:11,215] [INFO] ── Ciclo 42 ──────────────────────
+[2026-04-09 08:37:13,297] [INFO] ── Ciclo 43 ──────────────────────
+[2026-04-09 08:38:15,411] [INFO] ── Ciclo 44 ──────────────────────
+[2026-04-09 08:39:17,510] [INFO] ── Ciclo 45 ──────────────────────
+[2026-04-09 08:40:19,624] [INFO] ── Ciclo 46 ──────────────────────
+[2026-04-09 08:40:21,701] [INFO] 📋 1 task(s) pendente(s)
+[2026-04-09 08:40:21,701] [INFO] ▶️  Executando task 1 → caio [text]
+[2026-04-09 08:40:24,122] [INFO] Verificando processos Chrome conflitantes...
+[2026-04-09 08:40:25,663] [INFO] Iniciando Playwright | Perfil: C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\perfil_bot_whatsapp
+[2026-04-09 08:40:25,663] [INFO] Modo de execução: auto
+[2026-04-09 08:40:52,086] [INFO] is_auto = True
+[2026-04-09 08:40:52,087] [INFO] ❌ Falha no processo: Chrome/Edge não encontrado no sistema
+[2026-04-09 08:40:52,091] [ERROR] ❌ Task 1 falhou: Chrome/Edge não encontrado no sistema
+Traceback (most recent call last):
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\agent.py", line 249, in execute_task
+    executar_envio(
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 428, in executar_envio
+    raise e
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 409, in executar_envio
+    pw, context, page = iniciar_driver(userdir, modo_execucao, logger)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 94, in iniciar_driver
+    chromium_path = get_chrome_path()
+                    ^^^^^^^^^^^^^^^^^
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\paths.py", line 56, in get_chrome_path
+    raise FileNotFoundError("Chrome/Edge não encontrado no sistema")
+FileNotFoundError: Chrome/Edge não encontrado no sistema
+
+[2026-04-09 08:40:52,092] [INFO] Verificando processos Chrome conflitantes...
+[2026-04-09 08:40:53,611] [INFO] Iniciando Playwright | Perfil: C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\perfil_bot_whatsapp
+[2026-04-09 08:40:53,611] [INFO] Modo de execução: auto
+[2026-04-09 08:41:57,754] [INFO] ── Ciclo 47 ──────────────────────
+[2026-04-09 08:42:59,831] [INFO] ── Ciclo 48 ──────────────────────
+[2026-04-09 08:44:01,956] [INFO] ── Ciclo 49 ──────────────────────
+[2026-04-09 08:44:04,189] [INFO] 📋 1 task(s) pendente(s)
+[2026-04-09 08:44:04,190] [INFO] ▶️  Executando task 1 → caio [text]
+[2026-04-09 08:44:06,260] [INFO] Verificando processos Chrome conflitantes...
+[2026-04-09 08:44:07,861] [INFO] Iniciando Playwright | Perfil: C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\perfil_bot_whatsapp
+[2026-04-09 08:44:07,861] [INFO] Modo de execução: auto
+[2026-04-09 08:44:07,868] [INFO] ❌ Falha no processo: It looks like you are using Playwright Sync API inside the asyncio loop.
+Please use the Async API instead.
+[2026-04-09 08:44:07,905] [ERROR] ❌ Task 1 falhou: It looks like you are using Playwright Sync API inside the asyncio loop.
+Please use the Async API instead.
+Traceback (most recent call last):
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\agent.py", line 249, in execute_task
+    executar_envio(
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 428, in executar_envio
+    raise e
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 409, in executar_envio
+    pw, context, page = iniciar_driver(userdir, modo_execucao, logger)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 75, in iniciar_driver
+    pw = sync_playwright().start()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\venv\Lib\site-packages\playwright\sync_api\_context_manager.py", line 84, in start
+    return self.__enter__()
+           ^^^^^^^^^^^^^^^^
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\venv\Lib\site-packages\playwright\sync_api\_context_manager.py", line 47, in __enter__
+    raise Error(
+playwright._impl._errors.Error: It looks like you are using Playwright Sync API inside the asyncio loop.
+Please use the Async API instead.
+
+[2026-04-09 08:44:07,905] [INFO] Verificando processos Chrome conflitantes...
+[2026-04-09 08:44:09,469] [INFO] Iniciando Playwright | Perfil: C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\perfil_bot_whatsapp
+[2026-04-09 08:44:09,471] [INFO] Modo de execução: auto
+[2026-04-09 08:45:13,666] [INFO] ── Ciclo 50 ──────────────────────
+[2026-04-09 08:46:15,752] [INFO] ── Ciclo 51 ──────────────────────
+[2026-04-09 08:47:19,881] [INFO] ── Ciclo 52 ──────────────────────
+[2026-04-09 08:48:22,013] [INFO] ── Ciclo 53 ──────────────────────
+[2026-04-09 08:49:24,121] [INFO] ── Ciclo 54 ──────────────────────
+[2026-04-09 08:50:26,428] [INFO] ── Ciclo 55 ──────────────────────
+[2026-04-09 08:51:28,556] [INFO] ── Ciclo 56 ──────────────────────
+[2026-04-09 08:52:30,688] [INFO] ── Ciclo 57 ──────────────────────
+[2026-04-09 08:53:32,806] [INFO] ── Ciclo 58 ──────────────────────
+[2026-04-09 08:54:34,948] [INFO] ── Ciclo 59 ──────────────────────
+[2026-04-09 08:55:37,069] [INFO] ── Ciclo 60 ──────────────────────

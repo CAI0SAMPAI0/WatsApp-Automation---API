@@ -3,6 +3,7 @@ pywebview>=4.4.1          # substitui CustomTkinter — janela nativa com HTML/C
 
 # ── automação ──────────────────────────────────────────────────────
 playwright>=1.41.0
+nest-asyncio>=1.5.8 
 
 # ── sistema ────────────────────────────────────────────────────────
 pyperclip>=1.8.2
