@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Study Practices</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+</head>
+
+<body>
+  <div id="app">
+
+    <header>
+      <div class="logo">
+        <div class="logo-icon"><img src="logo.png" alt="logo" /></div>
+        <div class="logo-name">Study <span>Practices</span></div>
+      </div>
+      <div class="header-right">
+        <button class="theme-btn" id="themeBtn" title="Alternar tema" onclick="toggleTheme()">🌙</button>
+        <button class="theme-btn" onclick="logout()" title="Sair">🚪</button>
+        <div class="badge-count">
+          <span class="dot"></span>
+          <span id="execCount">0</span> envios
+        </div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="envio">Novo Envio</button>
+      <button class="tab" data-tab="agenda">Meus Agendamentos</button>
+    </div>
+
+    <div class="panels">
+
+      <!-- PANEL: ENVIO -->
+      <div id="panel-envio" class="panel active">
+
+        <div class="sub-tabs">
+          <div class="sub-tab active" id="stab-simples" onclick="switchSubTab('simples')">Envio simples</div>
+          <div class="sub-tab" id="stab-lote" onclick="switchSubTab('lote')">Envio em lote</div>
+        </div>
+
+        <!-- ── SIMPLES ── -->
+        <div id="form-simples" style="display:flex;flex-direction:column;gap:14px;">
+
+          <div class="field">
+            <label>Contato / Número</label>
+            <input id="target" type="text" placeholder="Ex: 5511999999999 ou nome do grupo" />
+          </div>
+
+          <div class="field">
+            <label>Tipo de envio</label>
+            <div class="mode-pills">
+              <div class="mode-pill active" data-mode="text">Só texto</div>
+              <div class="mode-pill" data-mode="file">Só arquivo</div>
+              <div class="mode-pill" data-mode="file_text">Arquivo + texto</div>
+            </div>
+          </div>
+
+          <div class="field" id="msg-field">
+            <label>Mensagem</label>
+            <textarea id="message" placeholder="Digite sua mensagem aqui..."></textarea>
+          </div>
+
+          <div class="file-area disabled" id="fileArea">
+            <div class="file-icon">📎</div>
+            <div class="file-info">
+              <div class="file-title">Selecionar arquivo(s)</div>
+              <div class="file-sub" id="fileLabel">Nenhum arquivo selecionado</div>
+            </div>
+          </div>
+
+          <div class="dt-row">
+            <div class="field" style="flex:1">
+              <label>Data</label>
+              <div class="date-wrap">
+                <input type="text" id="dateInput" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
+                  autocomplete="off" />
+                <button class="cal-btn" onclick="openCal('dateInput')">📅</button>
+              </div>
+            </div>
+            <div class="field time-field">
+              <label>Hora</label>
+              <input type="text" id="timeInput" maxlength="5" placeholder="HH:MM" />
+            </div>
+          </div>
+
+          <div class="toggle-row" id="dailyRow" onclick="toggleDaily()">
+            <span class="toggle-label">Enviar todos os dias (recorrente)</span>
+            <div class="toggle" id="dailyToggleUI">
+              <div class="toggle-track"></div>
+              <div class="toggle-thumb"></div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost" id="btnEnviar" onclick="handleEnviarAgora()">
+              <span class="spinner"></span>
+              <span class="btn-label">Enviar agora</span>
+            </button>
+            <button class="btn btn-primary" id="btnAgendar" onclick="handleAgendar()">
+              <span class="spinner"></span>
+              <span class="btn-label">Agendar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── LOTE ── -->
+        <div id="form-lote" style="display:none;flex-direction:column;gap:14px;">
+          <div class="lote-hint">Digite os destinatários separados por vírgula, depois configure o conteúdo de cada um
+            individualmente apertando no botão <strong>CONFIGURAR</strong> para agendar ou enviar na hora.</div>
+          <div class="field">
+            <label>Destinatários (separados por vírgula)</label>
+            <div style="display:flex;gap:8px;">
+              <input id="loteTargets" type="text" placeholder="Grupo A, Tips Basic, 5511999999999" style="flex:1"
+                oninput="previewLoteCards()" />
+              <button class="btn-parse" onclick="buildLoteCards()">Configurar ▸</button>
+            </div>
+          </div>
+          <div id="loteCards"></div>
+          <div class="btn-row" id="loteBtns" style="display:none;">
+            <button class="btn btn-ghost" id="btnEnviarLote" onclick="handleEnviarLote()">
+              <span class="spinner"></span><span class="btn-label">Enviar agora</span>
+            </button>
+            <button class="btn btn-primary" id="btnAgendarLote" onclick="handleAgendarLote()">
+              <span class="spinner"></span><span class="btn-label">Agendar lote</span>
+            </button>
+          </div>
+          <div id="loteDt" style="display:none;flex-direction:column;gap:14px;">
+            <div class="dt-row">
+              <div class="field" style="flex:1">
+                <label>Data</label>
+                <div class="date-wrap">
+                  <input type="text" id="loteDateInput" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
+                    autocomplete="off" />
+                  <button class="cal-btn" onclick="openCal('loteDateInput')">📅</button>
+                </div>
+              </div>
+              <div class="field time-field">
+                <label>Hora início</label>
+                <input type="text" id="loteTimeInput" maxlength="5" placeholder="HH:MM" />
+              </div>
+            </div>
+            <div class="toggle-row" onclick="toggleLoteDaily()">
+              <span class="toggle-label">Enviar todos os dias (recorrente)</span>
+              <div class="toggle" id="loteDailyUI">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-ghost" onclick="cancelLoteAgendar()">Cancelar</button>
+              <button class="btn btn-primary" id="btnConfirmarLote" onclick="confirmarAgendarLote()">
+                <span class="spinner"></span><span class="btn-label">Confirmar agendamento</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /panel-envio -->
+
+      <!-- PANEL: AGENDA -->
+      <div id="panel-agenda" class="panel">
+        <div class="agenda-header">
+          <span class="agenda-title">Histórico</span>
+        </div>
+        <div id="cardList"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <!-- CALENDÁRIO POPUP -->
+  <div id="calPopup" class="cal-popup">
+    <div class="cal-nav">
+      <button onclick="calMove(-1)">‹</button>
+      <span id="calTitle"></span>
+      <button onclick="calMove(1)">›</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>Dom</span><span>Seg</span><span>Ter</span>
+      <span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+    </div>
+    <div id="calDays" class="cal-days"></div>
+  </div>
+
+  <!-- MODAL: FINS DE SEMANA -->
+  <div class="modal-overlay" id="modalWk">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Enviar nos fins de semana?</div>
+        <button class="modal-close" onclick="resolveWk(null)">✕</button>
+      </div>
+      <div class="wk-picker">
+        <div class="wk-opt" onclick="resolveWk(true)"><span class="wk-ico">📅</span><span class="wk-label">Todos os
+            dias</span></div>
+        <div class="wk-opt" onclick="resolveWk(false)"><span class="wk-ico">💼</span><span class="wk-label">Seg –
+            Sex</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR -->
+  <div class="modal-overlay" id="modalEdit">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Editar agendamento</div>
+        <button class="modal-close" onclick="closeEditModal()">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div class="field"><label>Contato</label><input id="editTarget" type="text" /></div>
+        <div class="field">
+          <label>Tipo de envio</label>
+          <div class="custom-select" id="editModeSelect">
+            <div class="cs-selected" onclick="toggleCustomSelect('editModeSelect')">
+              <span class="cs-label">Só texto</span>
+              <span class="cs-arrow">▾</span>
+            </div>
+            <div class="cs-options">
+              <div class="cs-option active" data-value="text"
+                onclick="pickCustomSelect('editModeSelect','text','Só texto')">Só texto</div>
+              <div class="cs-option" data-value="file" onclick="pickCustomSelect('editModeSelect','file','Só arquivo')">
+                Só arquivo</div>
+              <div class="cs-option" data-value="file_text"
+                onclick="pickCustomSelect('editModeSelect','file_text','Arquivo + texto')">Arquivo + texto</div>
+            </div>
+          </div>
+          <input type="hidden" id="editMode" value="text" />
+        </div>
+        <div class="field" id="editMsgField"><label>Mensagem</label><textarea id="editMessage"></textarea></div>
+        <div class="file-area" id="editFileArea" onclick="handleEditFile()">
+          <div class="file-icon">📎</div>
+          <div class="file-info">
+            <div class="file-title">Alterar arquivo(s)</div>
+            <div class="file-sub" id="editFileLabel">—</div>
+          </div>
+        </div>
+        <div class="dt-row">
+          <div class="field" style="flex:1">
+            <label>Data</label>
+            <div class="date-wrap">
+              <input type="text" id="editDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
+                autocomplete="off" />
+              <button class="cal-btn" onclick="openCal('editDate')">📅</button>
+            </div>
+          </div>
+          <div class="field time-field">
+            <label>Hora</label>
+            <input type="text" id="editTime" maxlength="5" placeholder="HH:MM" />
+          </div>
+        </div>
+        <div class="toggle-row" id="editDailyRow" onclick="toggleEditDaily()">
+          <span class="toggle-label">Todos os dias</span>
+          <div class="toggle" id="editDailyToggleUI">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" style="flex:.4" onclick="closeEditModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btnSalvarEdit" onclick="handleSalvarEdit()">
+          <span class="spinner"></span><span class="btn-label">Salvar</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ARQUIVO LOTE -->
+  <div class="modal-overlay" id="modalLoteFile">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modalLoteFileTitle">Arquivo para destinatário</div>
+        <button class="modal-close" onclick="closeLoteFileModal()">✕</button>
+      </div>
+      <div id="modalLoteFileContent" style="font-size:13px;color:var(--text2);margin-bottom:16px;"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="clearLoteFile()">Remover arquivo</button>
+        <button class="btn btn-primary" onclick="pickLoteFile()"><span class="btn-label">Selecionar
+            arquivo</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITAR LOTE -->
+  <div class="modal-overlay" id="modalEditLote">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <div class="modal-title">Editar lote</div>
+        <button class="modal-close" onclick="closeEditLoteModal()">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;max-height:55vh;overflow-y:auto;padding-right:4px">
+        <div id="editLoteItens"></div>
+      </div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+        <div class="dt-row">
+          <div class="field" style="flex:1">
+            <label>Data</label>
+            <div class="date-wrap">
+              <input type="text" id="editLoteDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
+                autocomplete="off" />
+              <button class="cal-btn" onclick="openCal('editLoteDate')">📅</button>
+            </div>
+          </div>
+          <div class="field time-field">
+            <label>Hora</label>
+            <input type="text" id="editLoteTime" maxlength="5" placeholder="HH:MM" />
+          </div>
+        </div>
+        <div class="toggle-row" onclick="toggleEditLoteDaily()">
+          <span class="toggle-label">Todos os dias</span>
+          <div class="toggle" id="editLoteDailyUI">
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" style="flex:.4" onclick="closeEditLoteModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btnSalvarEditLote" onclick="handleSalvarEditLote()">
+          <span class="spinner"></span><span class="btn-label">Salvar lote</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,7 @@
+requests>=2.31.0
+python-dotenv>=1.0.0
+pywin32>=306
+playwright>=1.41.0
+pyperclip>=1.8.2
+psutil>=5.9.0
+pyinstaller>=6.4.0

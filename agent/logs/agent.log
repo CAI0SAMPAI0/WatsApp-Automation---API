@@ -1,0 +1,32 @@
+[2026-04-08 22:40:18,443] [INFO] 🤖 Agente v1.0.0 iniciado
+[2026-04-08 22:40:18,444] [INFO]    API: http://localhost:8000
+[2026-04-08 22:40:18,444] [INFO]    Intervalo: 60s
+[2026-04-08 22:40:20,521] [ERROR] ❌ Falha ao obter token: 401 Client Error: Unauthorized for url: http://localhost:8000/auth/token
+[2026-04-08 22:40:20,521] [ERROR] ❌ Não foi possível autenticar. Verifique AGENT_EMAIL e AGENT_SECRET no .env
+[2026-04-08 22:43:28,355] [INFO] 🤖 Agente v1.0.0 iniciado
+[2026-04-08 22:43:28,357] [INFO]    API: http://localhost:8000
+[2026-04-08 22:43:28,357] [INFO]    Intervalo: 60s
+[2026-04-08 22:43:30,430] [ERROR] ❌ Falha ao obter token: 401 Client Error: Unauthorized for url: http://localhost:8000/auth/token
+[2026-04-08 22:43:30,430] [ERROR] ❌ Não foi possível autenticar. Verifique AGENT_EMAIL e AGENT_SECRET no .env
+[2026-04-08 22:43:56,717] [INFO] 🤖 Agente v1.0.0 iniciado
+[2026-04-08 22:43:56,717] [INFO]    API: http://localhost:8000
+[2026-04-08 22:43:56,717] [INFO]    Intervalo: 60s
+[2026-04-08 22:43:58,787] [ERROR] ❌ Falha ao obter token: 401 Client Error: Unauthorized for url: http://localhost:8000/auth/token
+[2026-04-08 22:43:58,795] [ERROR] ❌ Não foi possível autenticar. Verifique AGENT_EMAIL e AGENT_SECRET no .env
+[2026-04-08 22:45:46,276] [INFO] 🤖 Agente v1.0.0 iniciado
+[2026-04-08 22:45:46,276] [INFO]    API: http://localhost:8000
+[2026-04-08 22:45:46,276] [INFO]    Intervalo: 60s
+[2026-04-08 22:45:48,576] [INFO] ✅ Token JWT obtido/renovado
+[2026-04-08 22:45:48,576] [INFO] ── Ciclo 1 ──────────────────────
+[2026-04-08 22:45:50,616] [ERROR] GET /agent/version falhou: 404 Client Error: Not Found for url: http://localhost:8000/agent/version
+[2026-04-09 07:50:52,084] [INFO] 🤖 Agente v1.0.0 iniciado
+[2026-04-09 07:50:52,084] [INFO]    API: http://localhost:8000
+[2026-04-09 07:50:52,084] [INFO]    Intervalo: 60s
+[2026-04-09 07:50:56,157] [ERROR] ❌ Falha ao obter token: HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /auth/token (Caused by NewConnectionError("HTTPConnection(host='localhost', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+[2026-04-09 07:50:56,159] [ERROR] ❌ Não foi possível autenticar. Verifique AGENT_EMAIL e AGENT_SECRET no .env
+[2026-04-09 07:52:16,712] [INFO] 🤖 Agente v1.0.0 iniciado
+[2026-04-09 07:52:16,712] [INFO]    API: http://localhost:8000
+[2026-04-09 07:52:16,712] [INFO]    Intervalo: 60s
+[2026-04-09 07:52:19,015] [INFO] ✅ Token JWT obtido/renovado
+[2026-04-09 07:52:19,016] [INFO] ── Ciclo 1 ──────────────────────
+[2026-04-09 07:52:21,089] [ERROR] GET /agent/version falhou: 404 Client Error: Not Found for url: http://localhost:8000/agent/version
