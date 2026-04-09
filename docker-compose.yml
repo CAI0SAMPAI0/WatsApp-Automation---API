@@ -12,7 +12,7 @@ services:
       AUTHENTICATION_TYPE: apikey
       AUTHENTICATION_API_KEY: SUA_CHAVE_AQUI
       DATABASE_ENABLED: "true"
-      DATABASE_CONNECTION_URI: postgresql://postgres:senha@postgres:5432/evolution
+      DATABASE_CONNECTION_URI: postgresql://postgres:based_07@postgres:5432/evolution
       DATABASE_CONNECTION_CLIENT_NAME: evolution
       REDIS_ENABLED: "true"
       REDIS_URI: redis://redis:6379
@@ -22,12 +22,12 @@ services:
       - redis
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:18
     container_name: postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: senha
+      POSTGRES_PASSWORD: based_07
       POSTGRES_DB: whatsapp_bot
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -54,7 +54,7 @@ services:
       REDIS_URL: redis://redis:6379
       EVOLUTION_URL: http://evolution:8080
       EVOLUTION_KEY: SUA_CHAVE_AQUI
-      JWT_SECRET_KEY: troque-isso
+      JWT_SECRET_KEY: 97dd826daf5570d793485d0810daa420e21b6f0b73be306c597e17ff4ad4fa74
       ADMIN_API_KEY: admin123
     depends_on:
       - postgres
