@@ -3,7 +3,7 @@ import json
 import subprocess
 from pathlib import Path
 from datetime import datetime, timedelta
-from agent.core.paths import get_app_base_dir
+from core.paths import get_app_base_dir
 
 APP_PATH = Path(get_app_base_dir())
 

@@ -4,7 +4,7 @@ import sys
 import datetime
 from typing import List, Tuple, Optional
 from pathlib import Path
-from agent.core.paths import get_user_data_dir
+from core.paths import get_user_data_dir
 
 # CONFIGURAÇÃO DE CAMINHOS
 

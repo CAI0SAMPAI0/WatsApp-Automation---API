@@ -30,3 +30,77 @@
 [2026-04-09 07:52:19,015] [INFO] ✅ Token JWT obtido/renovado
 [2026-04-09 07:52:19,016] [INFO] ── Ciclo 1 ──────────────────────
 [2026-04-09 07:52:21,089] [ERROR] GET /agent/version falhou: 404 Client Error: Not Found for url: http://localhost:8000/agent/version
+[2026-04-09 07:53:13,823] [INFO] 🤖 Agente v1.0.0 iniciado
+[2026-04-09 07:53:13,823] [INFO]    API: http://localhost:8000
+[2026-04-09 07:53:13,823] [INFO]    Intervalo: 60s
+[2026-04-09 07:53:16,141] [INFO] ✅ Token JWT obtido/renovado
+[2026-04-09 07:53:16,141] [INFO] ── Ciclo 1 ──────────────────────
+[2026-04-09 07:54:20,301] [INFO] ── Ciclo 2 ──────────────────────
+[2026-04-09 07:55:22,394] [INFO] ── Ciclo 3 ──────────────────────
+[2026-04-09 07:56:24,533] [INFO] ── Ciclo 4 ──────────────────────
+[2026-04-09 07:57:26,635] [INFO] ── Ciclo 5 ──────────────────────
+[2026-04-09 07:58:28,692] [INFO] ── Ciclo 6 ──────────────────────
+[2026-04-09 07:59:30,796] [INFO] ── Ciclo 7 ──────────────────────
+[2026-04-09 08:00:32,929] [INFO] ── Ciclo 8 ──────────────────────
+[2026-04-09 08:01:34,992] [INFO] ── Ciclo 9 ──────────────────────
+[2026-04-09 08:02:37,082] [INFO] ── Ciclo 10 ──────────────────────
+[2026-04-09 08:03:39,158] [INFO] ── Ciclo 11 ──────────────────────
+[2026-04-09 08:04:43,382] [INFO] ── Ciclo 12 ──────────────────────
+[2026-04-09 08:04:45,466] [INFO] 📋 1 task(s) pendente(s)
+[2026-04-09 08:04:45,466] [INFO] ▶️  Executando task 1 → caio [text]
+[2026-04-09 08:04:47,583] [ERROR] ❌ Task 1 falhou: No module named 'pyperclip'
+Traceback (most recent call last):
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\agent.py", line 248, in execute_task
+    from core.automation import executar_envio
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 6, in <module>
+    import pyperclip
+ModuleNotFoundError: No module named 'pyperclip'
+
+[2026-04-09 08:05:51,769] [INFO] ── Ciclo 13 ──────────────────────
+[2026-04-09 08:06:53,848] [INFO] ── Ciclo 14 ──────────────────────
+[2026-04-09 08:07:55,937] [INFO] ── Ciclo 15 ──────────────────────
+[2026-04-09 08:08:58,036] [INFO] ── Ciclo 16 ──────────────────────
+[2026-04-09 08:10:00,154] [INFO] ── Ciclo 17 ──────────────────────
+[2026-04-09 08:11:02,250] [INFO] ── Ciclo 18 ──────────────────────
+[2026-04-09 08:12:04,331] [INFO] ── Ciclo 19 ──────────────────────
+[2026-04-09 08:13:06,433] [INFO] ── Ciclo 20 ──────────────────────
+[2026-04-09 08:14:08,555] [INFO] ── Ciclo 21 ──────────────────────
+[2026-04-09 08:15:12,696] [INFO] ── Ciclo 22 ──────────────────────
+[2026-04-09 08:16:14,810] [INFO] ── Ciclo 23 ──────────────────────
+[2026-04-09 08:17:16,916] [INFO] ── Ciclo 24 ──────────────────────
+[2026-04-09 08:18:19,003] [INFO] ── Ciclo 25 ──────────────────────
+[2026-04-09 08:19:21,090] [INFO] ── Ciclo 26 ──────────────────────
+[2026-04-09 08:20:23,194] [INFO] ── Ciclo 27 ──────────────────────
+[2026-04-09 08:21:25,271] [INFO] ── Ciclo 28 ──────────────────────
+[2026-04-09 08:22:27,341] [INFO] ── Ciclo 29 ──────────────────────
+[2026-04-09 08:23:29,428] [INFO] ── Ciclo 30 ──────────────────────
+[2026-04-09 08:24:31,523] [INFO] ── Ciclo 31 ──────────────────────
+[2026-04-09 08:25:35,693] [INFO] ── Ciclo 32 ──────────────────────
+[2026-04-09 08:26:37,816] [INFO] ── Ciclo 33 ──────────────────────
+[2026-04-09 08:27:39,883] [INFO] ── Ciclo 34 ──────────────────────
+[2026-04-09 08:27:41,931] [INFO] 📋 1 task(s) pendente(s)
+[2026-04-09 08:27:41,931] [INFO] ▶️  Executando task 1 → caio [text]
+[2026-04-09 08:27:44,009] [ERROR] ❌ Task 1 falhou: No module named 'pyperclip'
+Traceback (most recent call last):
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\agent.py", line 248, in execute_task
+    from core.automation import executar_envio
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 6, in <module>
+    import pyperclip
+ModuleNotFoundError: No module named 'pyperclip'
+
+[2026-04-09 08:28:48,210] [INFO] ── Ciclo 35 ──────────────────────
+[2026-04-09 08:29:50,309] [INFO] ── Ciclo 36 ──────────────────────
+[2026-04-09 08:30:52,389] [INFO] ── Ciclo 37 ──────────────────────
+[2026-04-09 08:31:54,490] [INFO] ── Ciclo 38 ──────────────────────
+[2026-04-09 08:32:56,585] [INFO] ── Ciclo 39 ──────────────────────
+[2026-04-09 08:33:58,705] [INFO] ── Ciclo 40 ──────────────────────
+[2026-04-09 08:34:00,779] [INFO] 📋 1 task(s) pendente(s)
+[2026-04-09 08:34:00,780] [INFO] ▶️  Executando task 1 → caio [text]
+[2026-04-09 08:34:02,871] [ERROR] ❌ Task 1 falhou: No module named 'agent.core'; 'agent' is not a package
+Traceback (most recent call last):
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\agent.py", line 248, in execute_task
+    from core.automation import executar_envio
+  File "C:\Users\Caio\Documents\GitHub\Automacao_nova\agent\core\automation.py", line 7, in <module>
+    from agent.core.paths import get_chrome_path
+ModuleNotFoundError: No module named 'agent.core'; 'agent' is not a package
+

@@ -4,7 +4,7 @@ import time
 import sys
 import json
 import pyperclip
-from agent.core.paths import get_chrome_path
+from core.paths import get_chrome_path
 
 def _log(logger, msg):
     if logger:
