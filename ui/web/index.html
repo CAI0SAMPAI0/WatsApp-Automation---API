@@ -178,204 +178,215 @@
       <div id="panel-contatos" class="panel">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <span class="agenda-title">Meus Contatos</span>
-          <div style="display:flex;gap:8px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <!-- Importar CSV -->
             <label class="btn btn-ghost" style="padding:8px 14px;font-size:12px;cursor:pointer">
               📥 Importar CSV
-              <input type="file" accept=".csv" style="display:none" onchange="importContacts(this)">
+              <input type="file" id="_csvInput" accept=".csv" style="display:none" onchange="importContacts(this)">
             </label>
-            <button class="btn btn-ghost" style="padding:8px 14px;font-size:12px" onclick="syncWhatsAppContacts()">
-              🔄 Sincronizar WhatsApp
+
+            <!-- Agenda do Dispositivo (Web Contacts API) -->
+            <button class="btn btn-ghost" style="padding:8px 14px;font-size:12px"
+              onclick="importarContatosDispositivo()"
+              title="Abre a agenda do seu celular para selecionar contatos (Chrome Android / Edge)">
+              📱 Agenda do celular
             </button>
-            <button class="btn btn-primary" style="padding:8px 14px;font-size:12px" onclick="openAddContact()">+
-              Adicionar</button>
+
+            <!-- Sincronizar pelo WhatsApp conectado -->
+            <button class="btn btn-ghost" style="padding:8px 14px;font-size:12px" onclick="syncWhatsAppContacts()">
+              🔄 Sync WhatsApp
+            </button>
+
+            <!-- Adicionar manualmente -->
+            <button class="btn btn-primary" style="padding:8px 14px;font-size:12px" onclick="openAddContact()">
+              + Adicionar
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <div id="toast-container"></div>
+
+      <!-- CALENDÁRIO POPUP -->
+      <div id="calPopup" class="cal-popup">
+        <div class="cal-nav">
+          <button onclick="calMove(-1)">‹</button>
+          <span id="calTitle"></span>
+          <button onclick="calMove(1)">›</button>
+        </div>
+        <div class="cal-weekdays">
+          <span>Dom</span><span>Seg</span><span>Ter</span>
+          <span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+        </div>
+        <div id="calDays" class="cal-days"></div>
+      </div>
+
+      <!-- MODAL: FINS DE SEMANA -->
+      <div class="modal-overlay" id="modalWk">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title">Enviar nos fins de semana?</div>
+            <button class="modal-close" onclick="resolveWk(null)">✕</button>
+          </div>
+          <div class="wk-picker">
+            <div class="wk-opt" onclick="resolveWk(true)"><span class="wk-ico">📅</span><span class="wk-label">Todos os
+                dias</span></div>
+            <div class="wk-opt" onclick="resolveWk(false)"><span class="wk-ico">💼</span><span class="wk-label">Seg –
+                Sex</span></div>
           </div>
         </div>
-        <input id="contactSearch" type="text" placeholder="Buscar contato..." oninput="filterContacts(this.value)"
-          style="margin-bottom:12px" />
-        <div id="contactList"></div>
       </div>
 
-    </div>
-  </div>
-
-  <div id="toast-container"></div>
-
-  <!-- CALENDÁRIO POPUP -->
-  <div id="calPopup" class="cal-popup">
-    <div class="cal-nav">
-      <button onclick="calMove(-1)">‹</button>
-      <span id="calTitle"></span>
-      <button onclick="calMove(1)">›</button>
-    </div>
-    <div class="cal-weekdays">
-      <span>Dom</span><span>Seg</span><span>Ter</span>
-      <span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
-    </div>
-    <div id="calDays" class="cal-days"></div>
-  </div>
-
-  <!-- MODAL: FINS DE SEMANA -->
-  <div class="modal-overlay" id="modalWk">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Enviar nos fins de semana?</div>
-        <button class="modal-close" onclick="resolveWk(null)">✕</button>
-      </div>
-      <div class="wk-picker">
-        <div class="wk-opt" onclick="resolveWk(true)"><span class="wk-ico">📅</span><span class="wk-label">Todos os
-            dias</span></div>
-        <div class="wk-opt" onclick="resolveWk(false)"><span class="wk-ico">💼</span><span class="wk-label">Seg –
-            Sex</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: EDITAR -->
-  <div class="modal-overlay" id="modalEdit">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">Editar agendamento</div>
-        <button class="modal-close" onclick="closeEditModal()">✕</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px;">
-        <div class="field"><label>Contato</label><input id="editTarget" type="text" /></div>
-        <div class="field">
-          <label>Tipo de envio</label>
-          <div class="custom-select" id="editModeSelect">
-            <div class="cs-selected" onclick="toggleCustomSelect('editModeSelect')">
-              <span class="cs-label">Só texto</span>
-              <span class="cs-arrow">▾</span>
+      <!-- MODAL: EDITAR -->
+      <div class="modal-overlay" id="modalEdit">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title">Editar agendamento</div>
+            <button class="modal-close" onclick="closeEditModal()">✕</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="field"><label>Contato</label><input id="editTarget" type="text" /></div>
+            <div class="field">
+              <label>Tipo de envio</label>
+              <div class="custom-select" id="editModeSelect">
+                <div class="cs-selected" onclick="toggleCustomSelect('editModeSelect')">
+                  <span class="cs-label">Só texto</span>
+                  <span class="cs-arrow">▾</span>
+                </div>
+                <div class="cs-options">
+                  <div class="cs-option active" data-value="text"
+                    onclick="pickCustomSelect('editModeSelect','text','Só texto')">Só texto</div>
+                  <div class="cs-option" data-value="file"
+                    onclick="pickCustomSelect('editModeSelect','file','Só arquivo')">
+                    Só arquivo</div>
+                  <div class="cs-option" data-value="file_text"
+                    onclick="pickCustomSelect('editModeSelect','file_text','Arquivo + texto')">Arquivo + texto</div>
+                </div>
+              </div>
+              <input type="hidden" id="editMode" value="text" />
             </div>
-            <div class="cs-options">
-              <div class="cs-option active" data-value="text"
-                onclick="pickCustomSelect('editModeSelect','text','Só texto')">Só texto</div>
-              <div class="cs-option" data-value="file" onclick="pickCustomSelect('editModeSelect','file','Só arquivo')">
-                Só arquivo</div>
-              <div class="cs-option" data-value="file_text"
-                onclick="pickCustomSelect('editModeSelect','file_text','Arquivo + texto')">Arquivo + texto</div>
+            <div class="field" id="editMsgField"><label>Mensagem</label><textarea id="editMessage"></textarea></div>
+            <div class="file-area" id="editFileArea" onclick="handleEditFile()">
+              <div class="file-icon">📎</div>
+              <div class="file-info">
+                <div class="file-title">Alterar arquivo(s)</div>
+                <div class="file-sub" id="editFileLabel">—</div>
+              </div>
             </div>
-          </div>
-          <input type="hidden" id="editMode" value="text" />
-        </div>
-        <div class="field" id="editMsgField"><label>Mensagem</label><textarea id="editMessage"></textarea></div>
-        <div class="file-area" id="editFileArea" onclick="handleEditFile()">
-          <div class="file-icon">📎</div>
-          <div class="file-info">
-            <div class="file-title">Alterar arquivo(s)</div>
-            <div class="file-sub" id="editFileLabel">—</div>
-          </div>
-        </div>
-        <div class="dt-row">
-          <div class="field" style="flex:1">
-            <label>Data</label>
-            <div class="date-wrap">
-              <input type="text" id="editDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
-                autocomplete="off" />
-              <button class="cal-btn" onclick="openCal('editDate')">📅</button>
+            <div class="dt-row">
+              <div class="field" style="flex:1">
+                <label>Data</label>
+                <div class="date-wrap">
+                  <input type="text" id="editDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
+                    autocomplete="off" />
+                  <button class="cal-btn" onclick="openCal('editDate')">📅</button>
+                </div>
+              </div>
+              <div class="field time-field">
+                <label>Hora</label>
+                <input type="text" id="editTime" maxlength="5" placeholder="HH:MM" />
+              </div>
             </div>
-          </div>
-          <div class="field time-field">
-            <label>Hora</label>
-            <input type="text" id="editTime" maxlength="5" placeholder="HH:MM" />
-          </div>
-        </div>
-        <div class="toggle-row" id="editDailyRow" onclick="toggleEditDaily()">
-          <span class="toggle-label">Todos os dias</span>
-          <div class="toggle" id="editDailyToggleUI">
-            <div class="toggle-track"></div>
-            <div class="toggle-thumb"></div>
-          </div>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" style="flex:.4" onclick="closeEditModal()">Cancelar</button>
-        <button class="btn btn-primary" id="btnSalvarEdit" onclick="handleSalvarEdit()">
-          <span class="spinner"></span><span class="btn-label">Salvar</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: ARQUIVO LOTE -->
-  <div class="modal-overlay" id="modalLoteFile">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title" id="modalLoteFileTitle">Arquivo para destinatário</div>
-        <button class="modal-close" onclick="closeLoteFileModal()">✕</button>
-      </div>
-      <div id="modalLoteFileContent" style="font-size:13px;color:var(--text2);margin-bottom:16px;"></div>
-      <div class="btn-row">
-        <button class="btn btn-ghost" onclick="clearLoteFile()">Remover arquivo</button>
-        <button class="btn btn-primary" onclick="pickLoteFile()"><span class="btn-label">Selecionar
-            arquivo</span></button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL: EDITAR LOTE -->
-  <div class="modal-overlay" id="modalEditLote">
-    <div class="modal" style="max-width:480px">
-      <div class="modal-header">
-        <div class="modal-title">Editar lote</div>
-        <button class="modal-close" onclick="closeEditLoteModal()">✕</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px;max-height:55vh;overflow-y:auto;padding-right:4px">
-        <div id="editLoteItens"></div>
-      </div>
-      <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
-        <div class="dt-row">
-          <div class="field" style="flex:1">
-            <label>Data</label>
-            <div class="date-wrap">
-              <input type="text" id="editLoteDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
-                autocomplete="off" />
-              <button class="cal-btn" onclick="openCal('editLoteDate')">📅</button>
+            <div class="toggle-row" id="editDailyRow" onclick="toggleEditDaily()">
+              <span class="toggle-label">Todos os dias</span>
+              <div class="toggle" id="editDailyToggleUI">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </div>
             </div>
           </div>
-          <div class="field time-field">
-            <label>Hora</label>
-            <input type="text" id="editLoteTime" maxlength="5" placeholder="HH:MM" />
-          </div>
-        </div>
-        <div class="toggle-row" onclick="toggleEditLoteDaily()">
-          <span class="toggle-label">Todos os dias</span>
-          <div class="toggle" id="editLoteDailyUI">
-            <div class="toggle-track"></div>
-            <div class="toggle-thumb"></div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" style="flex:.4" onclick="closeEditModal()">Cancelar</button>
+            <button class="btn btn-primary" id="btnSalvarEdit" onclick="handleSalvarEdit()">
+              <span class="spinner"></span><span class="btn-label">Salvar</span>
+            </button>
           </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" style="flex:.4" onclick="closeEditLoteModal()">Cancelar</button>
-        <button class="btn btn-primary" id="btnSalvarEditLote" onclick="handleSalvarEditLote()">
-          <span class="spinner"></span><span class="btn-label">Salvar lote</span>
-        </button>
-      </div>
-    </div>
-  </div>
 
-  <div class="modal-overlay" id="modalContact">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title" id="contactModalTitle">Adicionar contato</div>
-        <button class="modal-close" onclick="closeContactModal()">✕</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <input type="hidden" id="contactId">
-        <div class="field"><label>Nome</label><input id="contactName" type="text" placeholder="Ex: João Silva" /></div>
-        <div class="field"><label>Número</label><input id="contactPhone" type="text" placeholder="Ex: 5511999999999" />
+      <!-- MODAL: ARQUIVO LOTE -->
+      <div class="modal-overlay" id="modalLoteFile">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title" id="modalLoteFileTitle">Arquivo para destinatário</div>
+            <button class="modal-close" onclick="closeLoteFileModal()">✕</button>
+          </div>
+          <div id="modalLoteFileContent" style="font-size:13px;color:var(--text2);margin-bottom:16px;"></div>
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="clearLoteFile()">Remover arquivo</button>
+            <button class="btn btn-primary" onclick="pickLoteFile()"><span class="btn-label">Selecionar
+                arquivo</span></button>
+          </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" style="flex:.4" onclick="closeContactModal()">Cancelar</button>
-        <button class="btn btn-primary" id="btnSaveContact" onclick="saveContact()">
-          <span class="spinner"></span><span class="btn-label">Salvar</span>
-        </button>
-      </div>
-    </div>
-  </div>
 
-  <script src="app.js"></script>
+      <!-- MODAL: EDITAR LOTE -->
+      <div class="modal-overlay" id="modalEditLote">
+        <div class="modal" style="max-width:480px">
+          <div class="modal-header">
+            <div class="modal-title">Editar lote</div>
+            <button class="modal-close" onclick="closeEditLoteModal()">✕</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px;max-height:55vh;overflow-y:auto;padding-right:4px">
+            <div id="editLoteItens"></div>
+          </div>
+          <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
+            <div class="dt-row">
+              <div class="field" style="flex:1">
+                <label>Data</label>
+                <div class="date-wrap">
+                  <input type="text" id="editLoteDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)"
+                    autocomplete="off" />
+                  <button class="cal-btn" onclick="openCal('editLoteDate')">📅</button>
+                </div>
+              </div>
+              <div class="field time-field">
+                <label>Hora</label>
+                <input type="text" id="editLoteTime" maxlength="5" placeholder="HH:MM" />
+              </div>
+            </div>
+            <div class="toggle-row" onclick="toggleEditLoteDaily()">
+              <span class="toggle-label">Todos os dias</span>
+              <div class="toggle" id="editLoteDailyUI">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" style="flex:.4" onclick="closeEditLoteModal()">Cancelar</button>
+            <button class="btn btn-primary" id="btnSalvarEditLote" onclick="handleSalvarEditLote()">
+              <span class="spinner"></span><span class="btn-label">Salvar lote</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="modalContact">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title" id="contactModalTitle">Adicionar contato</div>
+            <button class="modal-close" onclick="closeContactModal()">✕</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <input type="hidden" id="contactId">
+            <div class="field"><label>Nome</label><input id="contactName" type="text" placeholder="Ex: João Silva" />
+            </div>
+            <div class="field"><label>Número</label><input id="contactPhone" type="text"
+                placeholder="Ex: 5511999999999" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" style="flex:.4" onclick="closeContactModal()">Cancelar</button>
+            <button class="btn btn-primary" id="btnSaveContact" onclick="saveContact()">
+              <span class="spinner"></span><span class="btn-label">Salvar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <script src="app.js"></script>
 </body>
 
 </html>

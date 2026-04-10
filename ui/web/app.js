@@ -18,6 +18,9 @@ function loadTheme() {
 ══════════════════════════════════════════ */
 var filePath = null;
 var editFilePath = null;
+var fileNome = null;
+var editFileNome = null;
+var editFilePath = null;
 var editTaskId = null;
 var currentMode = 'text';
 var wkResolve = null;
@@ -413,18 +416,17 @@ function applyMode(mode) {
 ══════════════════════════════════════════ */
 function handleSelectFile() {
   openFilePicker(r => {
-    if (r.paths.length) {
-      filePath = r.joined;
-      updateFileLabel('fileLabel', r.paths.join(', '));
-    }
+    filePath = r.file_path;
+    fileNome = r.filename;
+    updateFileLabel("fileLabel", r.filename);
   });
 }
+
 function handleEditFile() {
   openFilePicker(r => {
-    if (r.paths.length) {
-      editFilePath = r.joined;
-      updateFileLabel('editFileLabel', r.paths.join(', '));
-    }
+    editFilePath = r.file_path;
+    editFileNome = r.filename;
+    updateFileLabel("editFileLabel", r.filename);
   });
 }
 
@@ -432,59 +434,85 @@ function handleEditFile() {
    ENVIO SIMPLES — ENVIAR AGORA
 ══════════════════════════════════════════ */
 async function handleEnviarAgora() {
-  const input = document.getElementById('target');
+  const input = document.getElementById("target");
   const target = input.dataset.resolvedValue || input.value.trim();
-  const message = document.getElementById('message').value.trim();
-  if (!validateFields(target, currentMode, message, filePath)) return;
-  const btn = document.getElementById('btnEnviar');
+  const message = document.getElementById("message").value.trim();
+
+  // Validação clara por modo
+  if (!target) { toast("Informe o contato", "error"); return; }
+  if (currentMode === "text" && !message) { toast("Escreva uma mensagem", "error"); return; }
+  if (currentMode === "file" && !filePath) { toast("Selecione um arquivo", "error"); return; }
+  if (currentMode === "file_text" && (!filePath || !message)) {
+    toast("Selecione um arquivo e escreva uma mensagem", "error"); return;
+  }
+
+  const btn = document.getElementById("btnEnviar");
   setLoading(btn, true);
-  const r = await apiEnviarAgora({ target, mode: currentMode, message, file_path: filePath });
+
+  const r = await apiEnviarAgora({
+    target,
+    mode: currentMode,
+    message: currentMode !== "file" ? message : null,
+    file_path: currentMode !== "text" ? filePath : null,
+  });
+
   setLoading(btn, false);
   if (r && r.ok) { refreshCount(); resetForm(); }
 }
-
-window.__onEnvioResult = function (payload) {
-  setLoading(document.getElementById('btnEnviar'), false);
-  if (payload.ok) { refreshCount(); toast('Task enviada ao agente!', 'success'); resetForm(); }
-  else toast('Erro: ' + (payload.error || 'desconhecido'), 'error');
-};
 
 /* ══════════════════════════════════════════
    ENVIO SIMPLES — AGENDAR
 ══════════════════════════════════════════ */
 async function handleAgendar() {
-  const target = document.getElementById('target').value.trim();
-  const message = document.getElementById('message').value.trim();
-  const timeStr = document.getElementById('timeInput').value.trim();
-  const dateVal = document.getElementById('dateInput').value;
-  if (!validateFields(target, currentMode, message, filePath)) return;
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timeStr)) { toast('Hora inválida. Use HH:MM', 'error'); return; }
+  const input = document.getElementById("target");
+  const target = input.dataset.resolvedValue || input.value.trim();
+  const message = document.getElementById("message").value.trim();
+  const timeStr = document.getElementById("timeInput").value.trim();
+  const dateVal = document.getElementById("dateInput").value;
+
+  if (!target) { toast("Informe o contato", "error"); return; }
+  if (currentMode === "text" && !message) { toast("Escreva uma mensagem", "error"); return; }
+  if (currentMode === "file" && !filePath) { toast("Selecione um arquivo", "error"); return; }
+  if (currentMode === "file_text" && (!filePath || !message)) {
+    toast("Selecione um arquivo e escreva uma mensagem", "error"); return;
+  }
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timeStr)) { toast("Hora inválida. Use HH:MM", "error"); return; }
+
   let inclWk = true;
   if (isDailyOn) { inclWk = await askWeekends(); if (inclWk === null) return; }
-  const btn = document.getElementById('btnAgendar');
+
+  const btn = document.getElementById("btnAgendar");
   setLoading(btn, true);
+
   const r = await apiAgendar({
-    target, mode: currentMode, message, file_path: filePath,
-    date_str: isDailyOn ? '' : dateVal,
-    time_str: timeStr, daily: isDailyOn, include_weekends: inclWk,
+    target,
+    mode: currentMode,
+    message: currentMode !== "file" ? message : null,
+    file_path: currentMode !== "text" ? filePath : null,
+    date_str: isDailyOn ? "" : dateVal,
+    time_str: timeStr,
+    daily: isDailyOn,
+    include_weekends: inclWk,
   });
+
   setLoading(btn, false);
-  if (r && r.ok) { toast('Agendado!', 'success'); resetForm(); loadCards(true); }
+  if (r && r.ok) { toast("Agendado!", "success"); resetForm(); loadCards(true); }
 }
 
 /* ══════════════════════════════════════════
    LOTE
 ══════════════════════════════════════════ */
 function previewLoteCards() {
-  const targets = document.getElementById('loteTargets').value
-    .split(',').map(t => t.trim()).filter(Boolean);
+  const targets = document.getElementById("loteTargets").value
+    .split(",").map(t => t.trim()).filter(Boolean);
   loteItems = loteItems.filter(i => targets.includes(i.target));
   targets.forEach(t => {
     if (!loteItems.find(i => i.target === t))
-      loteItems.push({ target: t, mode: 'text', message: '', filePath: null });
+      loteItems.push({ target: t, mode: "text", message: "", file_path: null, filename: null });
   });
   renderLoteCards();
 }
+
 function buildLoteCards() {
   previewLoteCards();
   if (!loteItems.length) { toast('Digite ao menos um destinatário', 'error'); return; }
@@ -521,20 +549,31 @@ function setLoteMode(i, mode) { loteItems[i].mode = mode; if (mode === 'file') l
 function openLoteFileModal(i) {
   loteFileModalIdx = i;
   const item = loteItems[i];
-  document.getElementById('modalLoteFileTitle').textContent = `Arquivo — ${item.target}`;
-  document.getElementById('modalLoteFileContent').textContent = item.filePath ? `Atual: ${item.filePath}` : 'Nenhum arquivo selecionado';
-  document.getElementById('modalLoteFile').classList.add('open');
+  document.getElementById("modalLoteFileTitle").textContent = `Arquivo — ${item.target}`;
+  document.getElementById("modalLoteFileContent").textContent =
+    item.file_path ? `Atual: ${item.filename || "arquivo selecionado"}` : "Nenhum arquivo selecionado";
+  document.getElementById("modalLoteFile").classList.add("open");
 }
-function closeLoteFileModal() { document.getElementById('modalLoteFile').classList.remove('open'); loteFileModalIdx = null; }
+
 function pickLoteFile() {
   openFilePicker(r => {
-    if (r.paths.length && loteFileModalIdx !== null) {
-      loteItems[loteFileModalIdx].filePath = r.joined;
-      closeLoteFileModal(); renderLoteCards();
+    if (loteFileModalIdx !== null) {
+      loteItems[loteFileModalIdx].file_path = r.file_path;
+      loteItems[loteFileModalIdx].filename = r.filename;
+      closeLoteFileModal();
+      renderLoteCards();
     }
   });
 }
-function clearLoteFile() { if (loteFileModalIdx !== null) loteItems[loteFileModalIdx].filePath = null; closeLoteFileModal(); renderLoteCards(); }
+
+function clearLoteFile() {
+  if (loteFileModalIdx !== null) {
+    loteItems[loteFileModalIdx].file_path = null;
+    loteItems[loteFileModalIdx].filename = null;
+  }
+  closeLoteFileModal();
+  renderLoteCards();
+}
 
 function validateLote() {
   for (let i = 0; i < loteItems.length; i++) {
@@ -690,31 +729,30 @@ function renderCard(a) {
 </div>`;
 }
 
-function renderLoteCard(a) {
-  const running = a.status === 'running';
-  const itensHtml = (a.itens || []).map(item => `
-    <div class="lote-item-row">
-      <span class="lote-item-target">📱 ${esc(item.target)}</span>
-      <span class="lote-item-mode">${modeLabel(item.mode)}</span>
-      <span class="card-badge ${statusBadgeClass(item.status)}" style="font-size:9px">${statusLabel(item.status)}</span>
-    </div>`).join('');
-  return `<div class="card card-lote" data-batch="${esc(a.batch_id)}">
-  <div class="card-top" onclick="toggleLoteCard(this)" style="cursor:pointer">
-    <div>
-      <div class="card-target">📦 ${esc(a.target)}</div>
-      <div class="card-date">📅 ${esc(a.scheduled_time)} &nbsp;·&nbsp; ${a.count} destinatário(s)</div>
-    </div>
-    <div style="display:flex;align-items:center;gap:6px">
-      <span class="card-badge card-badge-status ${statusBadgeClass(a.status)}">${statusLabel(a.status)}</span>
-      <span class="lote-chevron">▾</span>
-    </div>
+function renderLoteCards() {
+  const c = document.getElementById("loteCards");
+  if (!loteItems.length) { c.innerHTML = ""; return; }
+  c.innerHTML = loteItems.map((item, i) => `
+<div class="lote-card">
+  <div class="lote-card-header">
+    <span class="lote-card-num">${i + 1}</span>
+    <span class="lote-card-target">${esc(item.target)}</span>
+    <button class="lote-card-remove" onclick="removeLoteItem(${i})">✕</button>
   </div>
-  <div class="lote-items-body" style="display:none">${itensHtml}</div>
-  <div class="card-actions">
-    <button class="card-btn card-btn-edit"  ${running ? 'disabled' : ''} data-action="edit-lote"   data-batch="${esc(a.batch_id)}">✏ Editar lote</button>
-    <button class="card-btn card-btn-del"   ${running ? 'disabled' : ''} data-action="delete-lote" data-batch="${esc(a.batch_id)}" data-target="${esc(a.target)}">🗑 Excluir lote</button>
+  <div class="lote-card-body">
+    <div class="lote-mode-pills">
+      <div class="lote-pill ${item.mode === "text" ? "active" : ""}" onclick="setLoteMode(${i},"text")">Texto</div>
+      <div class="lote-pill ${item.mode === "file" ? "active" : ""}" onclick="setLoteMode(${i},"file")">Arquivo</div>
+      <div class="lote-pill ${item.mode === "file_text" ? "active" : ""}" onclick="setLoteMode(${i},"file_text")">Arq+Texto</div>
+    </div>
+    ${item.mode !== "file" ? `<textarea class="lote-textarea" placeholder="Mensagem para ${esc(item.target)}..."
+      oninput="loteItems[${i}].message=this.value">${esc(item.message || "")}</textarea>` : ""}
+    ${item.mode !== "text" ? `<div class="lote-file-row" onclick="openLoteFileModal(${i})">
+      <span class="lote-file-icon">📎</span>
+      <span class="lote-file-name">${item.filename || "Selecionar arquivo"}</span>
+    </div>` : ""}
   </div>
-</div>`;
+</div>`).join("");
 }
 
 function toggleLoteCard(headerEl) {
@@ -749,19 +787,30 @@ async function handleDelete(id, target) {
 async function openEdit(id) {
   pausePolling();
   const r = await apiObterAgendamento(id);
-  if (!r || r.error) { resumePolling(); toast(r?.error || 'Erro', 'error'); return; }
+  if (!r || r.error) { resumePolling(); toast(r?.error || "Erro", "error"); return; }
+
   const a = r.agendamento;
-  editTaskId = id; editFilePath = a.file_path || null;
-  document.getElementById('editTarget').value = a.target || '';
-  document.getElementById('editMessage').value = a.message || '';
-  document.getElementById('editTime').value = a.time_str || '';
-  document.getElementById('editDate').value = a.date_str || '';
-  setCustomSelectValue('editModeSelect', a.mode || 'text');
-  applyEditMode(a.mode || 'text');
+  editTaskId = id;
+  editFilePath = a.file_path || null;   // mantém data URI se existir
+  editFileNome = null;
+
+  document.getElementById("editTarget").value = a.target || "";
+  document.getElementById("editMessage").value = a.message || "";
+  document.getElementById("editTime").value = a.time_str || "";
+  document.getElementById("editDate").value = a.date_str || "";
+  setCustomSelectValue("editModeSelect", a.mode || "text");
+  applyEditMode(a.mode || "text");
   resetEditDaily();
-  updateFileLabel('editFileLabel', editFilePath ? editFilePath : '—');
-  document.getElementById('modalEdit').classList.add('open');
+
+  // Se já tem arquivo, mostra indicação
+  const labelArquivo = editFilePath
+    ? (editFilePath.startsWith("data:") ? "Arquivo salvo (clique para trocar)" : editFilePath)
+    : "—";
+  updateFileLabel("editFileLabel", labelArquivo);
+
+  document.getElementById("modalEdit").classList.add("open");
 }
+
 function setupEditModeWatch() { document.getElementById('editMode').addEventListener('change', e => applyEditMode(e.target.value)); }
 function applyEditMode(mode) {
   document.getElementById('editMsgField').style.display = mode === 'file' ? 'none' : '';
@@ -773,20 +822,26 @@ async function handleSalvarEdit() {
   const isDaily = isEditDailyOn;
   let inclWk = true;
   if (isDaily) { inclWk = await askWeekends(); if (inclWk === null) return; }
-  const btn = document.getElementById('btnSalvarEdit');
+
+  const btn = document.getElementById("btnSalvarEdit");
   setLoading(btn, true);
+
+  const mode = document.getElementById("editMode").value;
+
   const r = await apiEditarAgendamento({
     task_id: editTaskId,
-    target: document.getElementById('editTarget').value.trim(),
-    mode: document.getElementById('editMode').value,
-    message: document.getElementById('editMessage').value.trim(),
-    file_path: editFilePath,
-    date_str: document.getElementById('editDate').value.trim(),
-    time_str: document.getElementById('editTime').value.trim(),
-    daily: isDaily, include_weekends: inclWk,
+    target: document.getElementById("editTarget").value.trim(),
+    mode,
+    message: mode !== "file" ? document.getElementById("editMessage").value.trim() : null,
+    file_path: mode !== "text" ? editFilePath : null,
+    date_str: document.getElementById("editDate").value.trim(),
+    time_str: document.getElementById("editTime").value.trim(),
+    daily: isDaily,
+    include_weekends: inclWk,
   });
+
   setLoading(btn, false);
-  if (r && r.ok) { toast('Agendamento atualizado!', 'success'); closeEditModal(); loadCards(true); }
+  if (r && r.ok) { toast("Agendamento atualizado!", "success"); closeEditModal(); loadCards(true); }
 }
 
 /* ══════════════════════════════════════════
@@ -861,7 +916,7 @@ async function openEditLote(batchId) {
 }
 
 function renderEditLoteItens() {
-  const c = document.getElementById('editLoteItens');
+  const c = document.getElementById("editLoteItens");
   c.innerHTML = editLoteItens.map((item, i) => `
 <div class="lote-card" style="margin-bottom:10px">
   <div class="lote-card-header">
@@ -870,21 +925,29 @@ function renderEditLoteItens() {
   </div>
   <div class="lote-card-body">
     <div class="lote-mode-pills">
-      <div class="lote-pill ${item.mode === 'text' ? 'active' : ''}"      onclick="setEditLoteMode(${i},'text')">Texto</div>
-      <div class="lote-pill ${item.mode === 'file' ? 'active' : ''}"      onclick="setEditLoteMode(${i},'file')">Arquivo</div>
-      <div class="lote-pill ${item.mode === 'file_text' ? 'active' : ''}" onclick="setEditLoteMode(${i},'file_text')">Arq+Texto</div>
+      <div class="lote-pill ${item.mode === "text" ? "active" : ""}" onclick="setEditLoteMode(${i},"text")">Texto</div>
+      <div class="lote-pill ${item.mode === "file" ? "active" : ""}" onclick="setEditLoteMode(${i},"file")">Arquivo</div>
+      <div class="lote-pill ${item.mode === "file_text" ? "active" : ""}" onclick="setEditLoteMode(${i},"file_text")">Arq+Texto</div>
     </div>
-    ${item.mode !== 'file' ? `<textarea class="lote-textarea" oninput="editLoteItens[${i}].message=this.value">${esc(item.message || '')}</textarea>` : ''}
-    ${item.mode !== 'text' ? `<div class="lote-file-row" onclick="pickEditLoteFile(${i})">
+    ${item.mode !== "file" ? `<textarea class="lote-textarea" oninput="editLoteItens[${i}].message=this.value">${esc(item.message || "")}</textarea>` : ""}
+    ${item.mode !== "text" ? `<div class="lote-file-row" onclick="pickEditLoteFile(${i})">
       <span class="lote-file-icon">📎</span>
-      <span>${item.file_path || 'Selecionar arquivo'}</span>
-    </div>`: ''}
+      <span>${item.filename || (item.file_path ? "Arquivo salvo" : "Selecionar arquivo")}</span>
+    </div>` : ""}
   </div>
-</div>`).join('');
+</div>`).join("");
 }
 
 function setEditLoteMode(i, mode) { editLoteItens[i].mode = mode; if (mode === 'file') editLoteItens[i].message = ''; renderEditLoteItens(); }
-function pickEditLoteFile(i) { openFilePicker(r => { if (r.paths.length) { editLoteItens[i].file_path = r.joined; renderEditLoteItens(); } }); }
+function pickEditLoteFile(i) {
+  openFilePicker(r => {
+    if (r) {
+      editLoteItens[i].file_path = r.file_path;
+      editLoteItens[i].filename = r.filename;
+      renderEditLoteItens();
+    }
+  });
+}
 function toggleEditLoteDaily() {
   isEditLoteDailyOn = !isEditLoteDailyOn;
   document.getElementById('editLoteDailyUI').classList.toggle('on', isEditLoteDailyOn);
@@ -894,30 +957,39 @@ function toggleEditLoteDaily() {
 function closeEditLoteModal() { document.getElementById('modalEditLote').classList.remove('open'); editLoteBatchId = null; editLoteItens = []; resumePolling(); }
 
 async function handleSalvarEditLote() {
-  const timeStr = document.getElementById('editLoteTime').value.trim();
-  const dateVal = document.getElementById('editLoteDate').value.trim();
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timeStr)) { toast('Hora inválida', 'error'); return; }
+  const timeStr = document.getElementById("editLoteTime").value.trim();
+  const dateVal = document.getElementById("editLoteDate").value.trim();
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(timeStr)) { toast("Hora inválida", "error"); return; }
+
   let inclWk = true;
   if (isEditLoteDailyOn) { inclWk = await askWeekends(); if (inclWk === null) return; }
 
   const dt = parseDateTime(dateVal, timeStr, isEditLoteDailyOn);
-  const btn = document.getElementById('btnSalvarEditLote');
+  const btn = document.getElementById("btnSalvarEditLote");
   setLoading(btn, true);
 
-  // atualiza cada task do lote
   const promises = editLoteItens.map(item =>
     PUT(`/panel/tasks/${item.id}`, {
-      target: item.target, mode: item.mode,
-      message: item.message || null, file_path: item.file_path || null,
+      target: item.target,
+      mode: item.mode,
+      message: item.mode !== "file" ? (item.message || null) : null,
+      file_path: item.mode !== "text" ? (item.file_path || null) : null,
       scheduled_time: dt.toISOString(),
-      is_daily: isEditLoteDailyOn, include_weekends: inclWk,
+      is_daily: isEditLoteDailyOn,
+      include_weekends: inclWk,
     })
   );
+
   const results = await Promise.all(promises);
   setLoading(btn, false);
 
-  if (results.some(Boolean)) { toast('Lote atualizado!', 'success'); closeEditLoteModal(); loadCards(true); }
-  else toast('Falha ao atualizar lote', 'error');
+  if (results.some(Boolean)) {
+    toast("Lote atualizado!", "success");
+    closeEditLoteModal();
+    loadCards(true);
+  } else {
+    toast("Falha ao atualizar lote", "error");
+  }
 }
 
 async function handleDeleteLote(batchId, target) {
@@ -942,17 +1014,21 @@ function validateFields(target, mode, message, fp) {
 }
 
 function resetForm() {
-  document.getElementById('target').value = '';
-  document.getElementById('message').value = '';
+  document.getElementById("target").value = "";
+  document.getElementById("message").value = "";
   filePath = null;
-  updateFileLabel('fileLabel', 'Nenhum arquivo selecionado');
-  document.querySelectorAll('.mode-pill').forEach(p => p.classList.remove('active'));
-  document.querySelector('[data-mode="text"]').classList.add('active');
-  currentMode = 'text'; applyMode('text'); setDateDefault();
+  fileNome = null;
+  updateFileLabel("fileLabel", "Nenhum arquivo selecionado");
+  document.querySelectorAll(".mode-pill").forEach(p => p.classList.remove("active"));
+  document.querySelector("[data-mode=\"text\"]").classList.add("active");
+  currentMode = "text";
+  applyMode("text");
+  setDateDefault();
   isDailyOn = false;
-  document.getElementById('dailyToggleUI').classList.remove('on');
-  const di = document.getElementById('dateInput');
-  di.disabled = false; di.style.opacity = '1';
+  document.getElementById("dailyToggleUI").classList.remove("on");
+  const di = document.getElementById("dateInput");
+  di.disabled = false;
+  di.style.opacity = "1";
 }
 
 function setLoading(btn, on) { if (btn) { btn.disabled = on; btn.classList.toggle('loading', on); } }
@@ -1039,8 +1115,8 @@ function closeContactModal() {
 }
 
 async function saveContact() {
-  const id    = document.getElementById('contactId').value;
-  const name  = document.getElementById('contactName').value.trim();
+  const id = document.getElementById('contactId').value;
+  const name = document.getElementById('contactName').value.trim();
   const phone = document.getElementById('contactPhone').value.trim();
   if (!name || !phone) { toast('Preencha nome e número', 'error'); return; }
   const btn = document.getElementById('btnSaveContact');
@@ -1079,17 +1155,14 @@ async function importContacts(input) {
 }
 
 async function syncWhatsAppContacts() {
-  const btn = event.target;
-  setLoading(btn, true);
-  btn.querySelector('.btn-label') 
-    ? null 
-    : btn.setAttribute('data-orig', btn.textContent);
-  
-  const r = await POST('/panel/my-contacts/sync-whatsapp');
-  setLoading(btn, false);
-  
-  if (r && r.ok) {
-    toast(`✅ ${r.imported} importados, ${r.updated} atualizados`, 'success');
-    loadMyContacts();
-  }
+    const btn = event.currentTarget || event.target;
+    setLoading(btn, true);
+ 
+    const r = await POST("/panel/my-contacts/sync-whatsapp");
+    setLoading(btn, false);
+ 
+    if (r && r.ok) {
+        toast(`✅ ${r.imported} importados, ${r.updated} atualizados`, "success");
+        loadMyContacts();
+    }
 }

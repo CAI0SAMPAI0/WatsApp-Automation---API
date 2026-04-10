@@ -2,6 +2,7 @@
 import logging
 import httpx
 import os
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,6 @@ def _fmt_numero(numero: str) -> str:
 
 
 def _normalizar(texto: str) -> str:
-    """Remove acentos, converte para minúsculo e elimina espaços extras."""
     if not texto:
         return ""
     return (
@@ -33,51 +33,69 @@ def _normalizar(texto: str) -> str:
 
 
 def _match(query_norm: str, candidato: str) -> bool:
-    """Verifica se query bate com candidato, ignorando acentos e capitalização."""
     return query_norm in _normalizar(candidato)
 
 
+def _detectar_tipo_mime(mime: str, filename: str) -> str:
+    """
+    Mapeia mime type para o tipo aceito pela Evolution API:
+    'image', 'video', 'audio', 'document'
+    """
+    if not mime:
+        mime = ""
+    mime = mime.lower()
+
+    if mime.startswith("image/"):
+        return "image"
+    if mime.startswith("video/"):
+        return "video"
+    if mime.startswith("audio/"):
+        return "audio"
+
+    # Para qualquer outro tipo (pdf, doc, xlsx, zip, etc) → document
+    return "document"
+
+
+def _extrair_data_uri(file_path: str):
+    """
+    Se file_path for um data URI (data:<mime>;base64,<dados>),
+    retorna (base64_data, mime, tipo_evolution).
+    Caso contrário retorna None.
+    """
+    if not file_path or not file_path.startswith("data:"):
+        return None
+
+    # formato: data:<mime>;base64,<dados>
+    match = re.match(r"data:([^;]+);base64,(.+)", file_path, re.DOTALL)
+    if not match:
+        return None
+
+    mime = match.group(1)
+    b64_data = match.group(2).strip()
+    tipo = _detectar_tipo_mime(mime, "")
+    return b64_data, mime, tipo
+
+
 async def resolver_destino(nome_ou_numero: str, db_contacts=None) -> str:
-    """
-    Resolve um nome/número para o JID do WhatsApp.
-
-    Ordem de prioridade:
-      1. Já é número ou JID → retorna direto
-      2. Busca exata nos contatos do banco (db_contacts)
-      3. Busca parcial nos contatos do banco
-      4. Busca exata nos grupos da Evolution API
-      5. Busca parcial nos grupos da Evolution API
-      6. Busca exata nos contatos da Evolution API
-      7. Busca parcial nos contatos da Evolution API
-      8. Retorna o valor original como fallback
-
-    Args:
-        nome_ou_numero: Nome do contato/grupo ou número de telefone
-        db_contacts: Lista de objetos Contact do banco (opcional).
-                     Cada item deve ter .name e .phone.
-    """
     nome = nome_ou_numero.strip()
 
-    # ── 1. Já é número ou JID ──────────────────────────────────────────────
     if "@" in nome or nome.replace("+", "").isdigit():
         return nome.replace("+", "")
 
     nome_norm = _normalizar(nome)
 
-    # ── 2 & 3. Banco de dados local (mais rápido, sem chamada HTTP) ────────
+    # Banco de dados local
     if db_contacts:
-        # busca exata
         for c in db_contacts:
             if _normalizar(c.name) == nome_norm:
                 logger.info(f"[resolver] Exato no banco: '{nome}' → {c.phone}")
                 return c.phone
-        # busca parcial
         for c in db_contacts:
             if nome_norm in _normalizar(c.name):
                 logger.info(f"[resolver] Parcial no banco: '{nome}' → {c.phone}")
                 return c.phone
 
-    # ── 4 & 5. Grupos da Evolution ─────────────────────────────────────────
+    # Grupos da Evolution
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(
@@ -87,12 +105,10 @@ async def resolver_destino(nome_ou_numero: str, db_contacts=None) -> str:
             )
             if r.status_code == 200:
                 grupos = r.json()
-                # exato
                 for g in grupos:
                     if _normalizar(g.get("subject", "")) == nome_norm:
                         logger.info(f"[resolver] Grupo exato: '{nome}' → {g['id']}")
                         return g["id"]
-                # parcial
                 for g in grupos:
                     if _match(nome_norm, g.get("subject", "")):
                         logger.info(f"[resolver] Grupo parcial: '{nome}' → {g['id']}")
@@ -100,7 +116,7 @@ async def resolver_destino(nome_ou_numero: str, db_contacts=None) -> str:
     except Exception as e:
         logger.warning(f"[resolver] Falha ao buscar grupos: {e}")
 
-    # ── 6 & 7. Contatos da Evolution ───────────────────────────────────────
+    # Contatos da Evolution
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(
@@ -128,7 +144,6 @@ async def resolver_destino(nome_ou_numero: str, db_contacts=None) -> str:
     except Exception as e:
         logger.warning(f"[resolver] Falha ao buscar contatos Evolution: {e}")
 
-    # ── 8. Fallback ────────────────────────────────────────────────────────
     logger.warning(f"[resolver] Não resolvido, usando valor original: '{nome}'")
     return nome
 
@@ -181,6 +196,45 @@ async def enviar_texto(numero: str, mensagem: str) -> dict:
         return r.json()
 
 
+async def enviar_midia(numero: str, file_path: str, legenda: str = "", nome_arquivo: str = "arquivo") -> dict:
+    """
+    Ponto de entrada unificado para envio de mídia.
+    Detecta automaticamente se file_path é:
+      - data URI (base64) → envia como base64
+      - URL http(s)       → envia como URL
+      - outro             → lança erro claro
+    """
+    parsed = _extrair_data_uri(file_path)
+
+    if parsed:
+        b64_data, mime, tipo = parsed
+        # tenta extrair nome do arquivo do base64 (não temos, usa genérico por tipo)
+        ext_map = {
+            "image": "imagem.jpg",
+            "video": "video.mp4",
+            "audio": "audio.mp3",
+            "document": "documento.pdf",
+        }
+        nome = nome_arquivo or ext_map.get(tipo, "arquivo")
+        return await _enviar_midia_base64_raw(numero, b64_data, tipo, nome, legenda)
+
+    if file_path.startswith("http://") or file_path.startswith("https://"):
+        # Detecta tipo pela extensão
+        ext = file_path.split("?")[0].rsplit(".", 1)[-1].lower()
+        tipo_map = {
+            "jpg": "image", "jpeg": "image", "png": "image", "gif": "image", "webp": "image",
+            "mp4": "video", "mov": "video", "avi": "video",
+            "mp3": "audio", "ogg": "audio", "wav": "audio",
+        }
+        tipo = tipo_map.get(ext, "document")
+        return await enviar_midia_url(numero, file_path, tipo, legenda, nome_arquivo)
+
+    raise ValueError(
+        f"file_path inválido: deve ser uma data URI (data:...) ou URL (http/https). "
+        f"Recebido: '{str(file_path)[:80]}'"
+    )
+
+
 async def enviar_midia_url(numero, url, tipo, legenda="", nome_arquivo="arquivo"):
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(
@@ -198,7 +252,7 @@ async def enviar_midia_url(numero, url, tipo, legenda="", nome_arquivo="arquivo"
         return r.json()
 
 
-async def enviar_midia_base64(numero, base64_data, tipo, nome_arquivo, legenda=""):
+async def _enviar_midia_base64_raw(numero, base64_data, tipo, nome_arquivo, legenda=""):
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(
             f"{EVOLUTION_URL}/message/sendMedia/{INSTANCE}",
@@ -216,8 +270,12 @@ async def enviar_midia_base64(numero, base64_data, tipo, nome_arquivo, legenda="
         return r.json()
 
 
+# Mantém compatibilidade com código antigo
+async def enviar_midia_base64(numero, base64_data, tipo, nome_arquivo, legenda=""):
+    return await _enviar_midia_base64_raw(numero, base64_data, tipo, nome_arquivo, legenda)
+
+
 async def resolver_contatos(q: str = "") -> list:
-    """Retorna contatos e grupos filtrados para autocomplete."""
     q_norm = _normalizar(q)
     resultados = []
 

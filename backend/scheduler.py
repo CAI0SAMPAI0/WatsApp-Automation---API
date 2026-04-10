@@ -7,13 +7,13 @@ from apscheduler.jobstores.redis import RedisJobStore
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, Task, TaskStatus, Contact
-from evolution import enviar_texto, enviar_midia_url, enviar_midia_base64, resolver_destino
+from evolution import enviar_texto, enviar_midia, resolver_destino
 
 logger = logging.getLogger(__name__)
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 
-# ── parse seguro da URL do Redis ──────────────────────────────────────────────
+
 def _redis_host_port(url: str):
     url = url.replace("redis://", "")
     if "@" in url:
@@ -32,7 +32,6 @@ jobstores = {
     )
 }
 
-# SEMPRE usar timezone de Brasília
 scheduler = AsyncIOScheduler(
     jobstores=jobstores,
     timezone="America/Sao_Paulo",
@@ -40,13 +39,6 @@ scheduler = AsyncIOScheduler(
 
 
 async def executar_task(task_id: int):
-    """
-    Executa um envio e atualiza o status no banco.
-
-    Resolução do destinatário:
-      1. Busca contatos do cliente no banco (rápido, sem HTTP)
-      2. Passa para resolver_destino() que tenta banco → grupos → contatos Evolution
-    """
     db: Session = SessionLocal()
     task = None
     try:
@@ -61,7 +53,6 @@ async def executar_task(task_id: int):
         task.status = TaskStatus.running
         db.commit()
 
-        # ── carrega contatos do cliente para resolução local ───────────────
         db_contacts = (
             db.query(Contact)
             .filter(Contact.client_id == task.client_id)
@@ -74,21 +65,27 @@ async def executar_task(task_id: int):
         modo = task.mode.value if hasattr(task.mode, "value") else task.mode
 
         if modo == "text":
-            await enviar_texto(numero, task.message or "")
+            # ── SOMENTE TEXTO ────────────────────────────────────────────────
+            if not task.message:
+                raise ValueError("Modo 'text' requer uma mensagem não vazia")
+            await enviar_texto(numero, task.message)
 
         elif modo == "file":
+            # ── SOMENTE ARQUIVO ──────────────────────────────────────────────
             fp = task.file_path or ""
-            if fp.startswith("http"):
-                await enviar_midia_url(numero, fp, "document")
-            else:
-                await enviar_midia_base64(numero, fp, "document", "arquivo")
+            if not fp:
+                raise ValueError("Modo 'file' requer file_path preenchido")
+            await enviar_midia(numero, fp, legenda="")
 
         elif modo == "file_text":
+            # ── ARQUIVO + LEGENDA ────────────────────────────────────────────
             fp = task.file_path or ""
-            if fp.startswith("http"):
-                await enviar_midia_url(numero, fp, "document", legenda=task.message or "")
-            else:
-                await enviar_midia_base64(numero, fp, "document", "arquivo", legenda=task.message or "")
+            if not fp:
+                raise ValueError("Modo 'file_text' requer file_path preenchido")
+            await enviar_midia(numero, fp, legenda=task.message or "")
+
+        else:
+            raise ValueError(f"Modo desconhecido: '{modo}'")
 
         task.status      = TaskStatus.completed
         task.executed_at = datetime.now(timezone.utc)
@@ -107,17 +104,13 @@ async def executar_task(task_id: int):
 
 def agendar_task(task_id: int, scheduled_time: datetime, is_daily: bool = False,
                  include_weekends: bool = True):
-    """
-    Agenda ou reagenda um job no APScheduler.
-    scheduled_time deve chegar como UTC — convertemos para Brasília internamente.
-    """
     job_id = f"task_{task_id}"
 
     if scheduled_time.tzinfo is None:
         scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
 
-    brt     = timezone(timedelta(hours=-3))
-    dt_brt  = scheduled_time.astimezone(brt)
+    brt    = timezone(timedelta(hours=-3))
+    dt_brt = scheduled_time.astimezone(brt)
 
     if is_daily:
         days = "mon-fri" if not include_weekends else "mon-sun"

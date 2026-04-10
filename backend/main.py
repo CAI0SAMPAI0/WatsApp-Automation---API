@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 import os as os_module
 import httpx
+import base64
 
 from database import (
     init_db, get_db,
@@ -267,27 +268,97 @@ def add_contact(
     return contact
 
 
-@app.put("/panel/my-contacts/{contact_id}", response_model=ContactOut, tags=["panel"])
-def update_contact(
-    contact_id: int,
-    payload: ContactCreate,
+@app.post("/panel/my-contacts/import", tags=["panel"])
+async def import_contacts_csv(
+    file: UploadFile = File(...),
     client: Client = Depends(get_current_client),
     db: Session = Depends(get_db),
 ):
-    contact = db.query(Contact).filter(
-        Contact.id == contact_id,
-        Contact.client_id == client.id
-    ).first()
-    if not contact:
-        raise HTTPException(status_code=404, detail="Contato não encontrado")
-    phone = _clean_phone(payload.phone)
-    if not phone:
-        raise HTTPException(status_code=400, detail="Número inválido")
-    contact.name = payload.name.strip()
-    contact.phone = phone
+    """
+    Importa contatos de CSV.
+    Suporta:
+      - Google Contacts (Name, Phone 1 - Value, ...)
+      - Android vCard exportado como CSV
+      - iPhone (First Name, Last Name, Phone)
+      - Formato simples: nome;numero ou nome,numero
+    """
+    content = await file.read()
+ 
+    # tenta decodificar em UTF-8 com BOM, fallback latin-1
+    for enc in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            text = content.decode(enc)
+            break
+        except Exception:
+            continue
+    else:
+        raise HTTPException(status_code=400, detail="Não foi possível decodificar o arquivo")
+ 
+    # detecta delimitador (vírgula ou ponto-e-vírgula)
+    first_line = text.split("\n")[0]
+    delimiter  = ";" if first_line.count(";") > first_line.count(",") else ","
+ 
+    reader  = csv.DictReader(io.StringIO(text), delimiter=delimiter)
+    headers = [h.lower().strip() for h in (reader.fieldnames or [])]
+ 
+    imported = 0
+    skipped  = 0
+ 
+    # Colunas possíveis por prioridade
+    NAME_COLS  = ["name", "nome", "display_name", "full name", "contact name"]
+    FIRST_COLS = ["first name", "primeiro nome", "given name", "firstname"]
+    LAST_COLS  = ["last name", "último nome", "surname", "lastname"]
+    PHONE_COLS = [
+        "phone", "phone 1 - value", "telefone", "numero", "número", "mobile",
+        "celular", "phone number", "tel", "telephone", "mobile phone",
+        "phone 1", "home phone", "work phone",
+    ]
+ 
+    def find_col(row: dict, candidates: list):
+        row_lower = {k.lower().strip(): v for k, v in row.items()}
+        for c in candidates:
+            if c in row_lower and row_lower[c]:
+                return row_lower[c].strip()
+        return ""
+ 
+    for row in reader:
+        # ── nome ─────────────────────────────────────────
+        name = find_col(row, NAME_COLS)
+        if not name:
+            first = find_col(row, FIRST_COLS)
+            last  = find_col(row, LAST_COLS)
+            name  = f"{first} {last}".strip()
+ 
+        # ── telefone ──────────────────────────────────────
+        phone = find_col(row, PHONE_COLS)
+ 
+        # se não achou por nome de coluna, tenta a segunda coluna (formato simples)
+        if not phone and len(row) >= 2:
+            vals = list(row.values())
+            phone = vals[1].strip() if len(vals) > 1 else ""
+ 
+        if not name or not phone:
+            skipped += 1
+            continue
+ 
+        phone = _clean_phone(phone)
+        if not phone:
+            skipped += 1
+            continue
+ 
+        existing = db.query(Contact).filter(
+            Contact.client_id == client.id,
+            Contact.phone == phone
+        ).first()
+ 
+        if existing:
+            existing.name = name
+        else:
+            db.add(Contact(client_id=client.id, name=name, phone=phone))
+            imported += 1
+ 
     db.commit()
-    db.refresh(contact)
-    return contact
+    return {"ok": True, "imported": imported, "skipped": skipped}
 
 
 @app.delete("/panel/my-contacts/{contact_id}", tags=["panel"])
@@ -523,6 +594,39 @@ async def report_error(
     )
     return {"ok": True, "error_id": error.id}
 
+
+@app.post("/panel/upload", tags=["panel"])
+async def upload_file(
+    file: UploadFile = File(...),
+    client: Client = Depends(get_current_client),
+):
+    """
+    Recebe arquivo do browser, converte para data URI base64.
+    O frontend salva o retorno (file_path = data URI) na task.
+    Limite: 10 MB.
+    """
+    MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+    content = await file.read()
+ 
+    if len(content) > MAX_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Arquivo muito grande ({len(content) // 1024} KB). Máximo permitido: 10 MB"
+        )
+ 
+    mime = file.content_type or "application/octet-stream"
+    filename = file.filename or "arquivo"
+    b64 = base64.b64encode(content).decode()
+    data_uri = f"data:{mime};base64,{b64}"
+ 
+    logger.info(f"Upload: {filename} ({len(content)} bytes) — cliente {client.id}")
+    return {
+        "ok":       True,
+        "file_path": data_uri,    # salvar isso em Task.file_path
+        "filename": filename,
+        "mime":     mime,
+        "size":     len(content),
+    }
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  PANEL — TASKS
