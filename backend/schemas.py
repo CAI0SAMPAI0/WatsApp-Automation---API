@@ -145,6 +145,19 @@ class AgentVersionOut(BaseModel):
     needs_update: bool             # calculado pelo backend: versão do agente < versão atual
 
 
+class ContactCreate(BaseModel):
+    name: str
+    phone: str
+
+class ContactOut(BaseModel):
+    id: int
+    client_id: int
+    name: str
+    phone: str
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
 # ══════════════════════════════════════════
 #  PAINEL — RESPOSTAS AGREGADAS
 # ══════════════════════════════════════════

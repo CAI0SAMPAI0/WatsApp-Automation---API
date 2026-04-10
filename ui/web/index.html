@@ -20,6 +20,10 @@
       </div>
       <div class="header-right">
         <button class="theme-btn" id="themeBtn" title="Alternar tema" onclick="toggleTheme()">🌙</button>
+        <label class="theme-btn" title="Importar contatos CSV" style="cursor:pointer">
+          📋
+          <input type="file" accept=".csv" style="display:none" onchange="importContacts(this)">
+        </label>
         <button class="theme-btn" onclick="logout()" title="Sair">🚪</button>
         <div class="badge-count">
           <span class="dot"></span>
@@ -31,6 +35,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="envio">Novo Envio</button>
       <button class="tab" data-tab="agenda">Meus Agendamentos</button>
+      <button class="tab" data-tab="contatos">Contatos</button>
     </div>
 
     <div class="panels">
@@ -168,6 +173,23 @@
           <span class="agenda-title">Histórico</span>
         </div>
         <div id="cardList"></div>
+      </div>
+
+      <div id="panel-contatos" class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <span class="agenda-title">Meus Contatos</span>
+          <div style="display:flex;gap:8px">
+            <label class="btn btn-ghost" style="padding:8px 14px;font-size:12px;cursor:pointer">
+              📥 Importar CSV
+              <input type="file" accept=".csv" style="display:none" onchange="importContacts(this)">
+            </label>
+            <button class="btn btn-primary" style="padding:8px 14px;font-size:12px" onclick="openAddContact()">+
+              Adicionar</button>
+          </div>
+        </div>
+        <input id="contactSearch" type="text" placeholder="Buscar contato..." oninput="filterContacts(this.value)"
+          style="margin-bottom:12px" />
+        <div id="contactList"></div>
       </div>
 
     </div>
@@ -324,6 +346,27 @@
         <button class="btn btn-ghost" style="flex:.4" onclick="closeEditLoteModal()">Cancelar</button>
         <button class="btn btn-primary" id="btnSalvarEditLote" onclick="handleSalvarEditLote()">
           <span class="spinner"></span><span class="btn-label">Salvar lote</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modalContact">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="contactModalTitle">Adicionar contato</div>
+        <button class="modal-close" onclick="closeContactModal()">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <input type="hidden" id="contactId">
+        <div class="field"><label>Nome</label><input id="contactName" type="text" placeholder="Ex: João Silva" /></div>
+        <div class="field"><label>Número</label><input id="contactPhone" type="text" placeholder="Ex: 5511999999999" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" style="flex:.4" onclick="closeContactModal()">Cancelar</button>
+        <button class="btn btn-primary" id="btnSaveContact" onclick="saveContact()">
+          <span class="spinner"></span><span class="btn-label">Salvar</span>
         </button>
       </div>
     </div>

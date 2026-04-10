@@ -156,3 +156,44 @@ async def enviar_midia_base64(numero, base64_data, tipo, nome_arquivo, legenda="
         )
         r.raise_for_status()
         return r.json()
+
+async def resolver_contatos(q: str = "") -> list:
+    """Retorna contatos e grupos filtrados para autocomplete."""
+    q_norm = _normalizar(q)
+    resultados = []
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(
+                f"{EVOLUTION_URL}/group/fetchAllGroups/{INSTANCE}",
+                headers=HEADERS,
+                params={"getParticipants": "false"},
+            )
+            if r.status_code == 200:
+                for g in r.json():
+                    nome = g.get("subject", "")
+                    if not q_norm or q_norm in _normalizar(nome):
+                        resultados.append({"label": nome, "value": g["id"], "tipo": "grupo"})
+    except Exception:
+        pass
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                f"{EVOLUTION_URL}/chat/findContacts/{INSTANCE}",
+                headers=HEADERS,
+                json={},
+            )
+            if r.status_code == 200:
+                for c in r.json():
+                    nome = c.get("pushName") or ""
+                    jid  = c.get("remoteJid", "")
+                    if not nome or not jid:
+                        continue
+                    if not q_norm or q_norm in _normalizar(nome):
+                        resultados.append({"label": nome, "value": jid, "tipo": "contato"})
+    except Exception:
+        pass
+
+    resultados.sort(key=lambda x: _normalizar(x["label"]))
+    return resultados[:30]

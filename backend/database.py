@@ -99,6 +99,13 @@ class AgentVersion(Base):
     is_current   = Column(Boolean, default=True)
     created_at   = Column(DateTime, default=datetime.utcnow)
 
+class Contact(Base):
+    __tablename__ = "contacts"
+    id         = Column(Integer, primary_key=True, index=True)
+    client_id  = Column(Integer, ForeignKey("clients.id"), nullable=False)
+    name       = Column(String(200), nullable=False)
+    phone      = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 def get_db():
     db = SessionLocal()
