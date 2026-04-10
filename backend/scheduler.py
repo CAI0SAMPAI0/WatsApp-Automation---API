@@ -7,7 +7,7 @@ from apscheduler.jobstores.redis import RedisJobStore
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, Task, TaskStatus
-from evolution import enviar_texto, enviar_midia_url, enviar_midia_base64
+from evolution import enviar_texto, enviar_midia_url, enviar_midia_base64, resolver_destino
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,6 @@ async def executar_task(task_id: int):
         task.status = TaskStatus.running
         db.commit()
 
-        from evolution import resolver_destino
         numero = await resolver_destino(task.target.strip())
         logger.info(f"[DEBUG] Destino resolvido: '{task.target}' → '{numero}'")
         modo   = task.mode.value if hasattr(task.mode, "value") else task.mode

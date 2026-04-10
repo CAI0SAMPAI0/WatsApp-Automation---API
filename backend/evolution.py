@@ -20,7 +20,9 @@ def _fmt_numero(numero: str) -> str:
 
 
 def _normalizar(texto: str) -> str:
-    return unicodedata.normalize("NFD", texto).encode("ascii", "ignore").decode("ascii").lower().strip()
+    if not texto:
+        return ""
+    return unicodedata.normalize("NFD", str(texto)).encode("ascii", "ignore").decode("ascii").lower().strip()
 
 
 async def resolver_destino(nome_ou_numero: str) -> str:
