@@ -1,0 +1,13 @@
+# ── interface ──────────────────────────────────────────────────────
+pywebview>=4.4.1          # substitui CustomTkinter — janela nativa com HTML/CSS/JS
+
+# ── automação ──────────────────────────────────────────────────────
+playwright>=1.41.0
+
+# ── sistema ────────────────────────────────────────────────────────
+pyperclip>=1.8.2
+psutil>=5.9.0
+Pillow>=10.2.0            # opcional: thumbnails de imagem
+
+# ── build ──────────────────────────────────────────────────────────
+pyinstaller>=6.4.0
