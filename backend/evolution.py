@@ -20,18 +20,64 @@ def _fmt_numero(numero: str) -> str:
 
 
 def _normalizar(texto: str) -> str:
+    """Remove acentos, converte para minúsculo e elimina espaços extras."""
     if not texto:
         return ""
-    return unicodedata.normalize("NFD", str(texto)).encode("ascii", "ignore").decode("ascii").lower().strip()
+    return (
+        unicodedata.normalize("NFD", str(texto))
+        .encode("ascii", "ignore")
+        .decode("ascii")
+        .lower()
+        .strip()
+    )
 
 
-async def resolver_destino(nome_ou_numero: str) -> str:
+def _match(query_norm: str, candidato: str) -> bool:
+    """Verifica se query bate com candidato, ignorando acentos e capitalização."""
+    return query_norm in _normalizar(candidato)
+
+
+async def resolver_destino(nome_ou_numero: str, db_contacts=None) -> str:
+    """
+    Resolve um nome/número para o JID do WhatsApp.
+
+    Ordem de prioridade:
+      1. Já é número ou JID → retorna direto
+      2. Busca exata nos contatos do banco (db_contacts)
+      3. Busca parcial nos contatos do banco
+      4. Busca exata nos grupos da Evolution API
+      5. Busca parcial nos grupos da Evolution API
+      6. Busca exata nos contatos da Evolution API
+      7. Busca parcial nos contatos da Evolution API
+      8. Retorna o valor original como fallback
+
+    Args:
+        nome_ou_numero: Nome do contato/grupo ou número de telefone
+        db_contacts: Lista de objetos Contact do banco (opcional).
+                     Cada item deve ter .name e .phone.
+    """
     nome = nome_ou_numero.strip()
+
+    # ── 1. Já é número ou JID ──────────────────────────────────────────────
     if "@" in nome or nome.replace("+", "").isdigit():
         return nome.replace("+", "")
 
     nome_norm = _normalizar(nome)
 
+    # ── 2 & 3. Banco de dados local (mais rápido, sem chamada HTTP) ────────
+    if db_contacts:
+        # busca exata
+        for c in db_contacts:
+            if _normalizar(c.name) == nome_norm:
+                logger.info(f"[resolver] Exato no banco: '{nome}' → {c.phone}")
+                return c.phone
+        # busca parcial
+        for c in db_contacts:
+            if nome_norm in _normalizar(c.name):
+                logger.info(f"[resolver] Parcial no banco: '{nome}' → {c.phone}")
+                return c.phone
+
+    # ── 4 & 5. Grupos da Evolution ─────────────────────────────────────────
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(
@@ -40,15 +86,21 @@ async def resolver_destino(nome_ou_numero: str) -> str:
                 params={"getParticipants": "false"},
             )
             if r.status_code == 200:
-                for g in r.json():
-                    if nome_norm == _normalizar(g.get("subject", "")):
+                grupos = r.json()
+                # exato
+                for g in grupos:
+                    if _normalizar(g.get("subject", "")) == nome_norm:
+                        logger.info(f"[resolver] Grupo exato: '{nome}' → {g['id']}")
                         return g["id"]
-                for g in r.json():
-                    if nome_norm in _normalizar(g.get("subject", "")):
+                # parcial
+                for g in grupos:
+                    if _match(nome_norm, g.get("subject", "")):
+                        logger.info(f"[resolver] Grupo parcial: '{nome}' → {g['id']}")
                         return g["id"]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"[resolver] Falha ao buscar grupos: {e}")
 
+    # ── 6 & 7. Contatos da Evolution ───────────────────────────────────────
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.post(
@@ -57,21 +109,27 @@ async def resolver_destino(nome_ou_numero: str) -> str:
                 json={},
             )
             if r.status_code == 200:
-                exatos = []
+                exatos   = []
                 parciais = []
                 for c in r.json():
                     push_norm = _normalizar(c.get("pushName", ""))
                     if push_norm == nome_norm:
                         exatos.append(c)
-                    elif push_norm.startswith(nome_norm):
+                    elif nome_norm in push_norm:
                         parciais.append(c)
                 if exatos:
-                    return exatos[0]["remoteJid"]
+                    jid = exatos[0]["remoteJid"]
+                    logger.info(f"[resolver] Contato exato Evolution: '{nome}' → {jid}")
+                    return jid
                 if parciais:
-                    return parciais[0]["remoteJid"]
-    except Exception:
-        pass
+                    jid = parciais[0]["remoteJid"]
+                    logger.info(f"[resolver] Contato parcial Evolution: '{nome}' → {jid}")
+                    return jid
+    except Exception as e:
+        logger.warning(f"[resolver] Falha ao buscar contatos Evolution: {e}")
 
+    # ── 8. Fallback ────────────────────────────────────────────────────────
+    logger.warning(f"[resolver] Não resolvido, usando valor original: '{nome}'")
     return nome
 
 
@@ -157,6 +215,7 @@ async def enviar_midia_base64(numero, base64_data, tipo, nome_arquivo, legenda="
         r.raise_for_status()
         return r.json()
 
+
 async def resolver_contatos(q: str = "") -> list:
     """Retorna contatos e grupos filtrados para autocomplete."""
     q_norm = _normalizar(q)
@@ -172,8 +231,12 @@ async def resolver_contatos(q: str = "") -> list:
             if r.status_code == 200:
                 for g in r.json():
                     nome = g.get("subject", "")
-                    if not q_norm or q_norm in _normalizar(nome):
-                        resultados.append({"label": nome, "value": g["id"], "tipo": "grupo"})
+                    if not q_norm or _match(q_norm, nome):
+                        resultados.append({
+                            "label": nome,
+                            "value": g["id"],
+                            "tipo": "grupo",
+                        })
     except Exception:
         pass
 
@@ -190,8 +253,12 @@ async def resolver_contatos(q: str = "") -> list:
                     jid  = c.get("remoteJid", "")
                     if not nome or not jid:
                         continue
-                    if not q_norm or q_norm in _normalizar(nome):
-                        resultados.append({"label": nome, "value": jid, "tipo": "contato"})
+                    if not q_norm or _match(q_norm, nome):
+                        resultados.append({
+                            "label": nome,
+                            "value": jid,
+                            "tipo": "contato",
+                        })
     except Exception:
         pass
 

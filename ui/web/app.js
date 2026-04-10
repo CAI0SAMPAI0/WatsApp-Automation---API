@@ -1077,3 +1077,19 @@ async function importContacts(input) {
   else toast('Erro ao importar', 'error');
   input.value = '';
 }
+
+async function syncWhatsAppContacts() {
+  const btn = event.target;
+  setLoading(btn, true);
+  btn.querySelector('.btn-label') 
+    ? null 
+    : btn.setAttribute('data-orig', btn.textContent);
+  
+  const r = await POST('/panel/my-contacts/sync-whatsapp');
+  setLoading(btn, false);
+  
+  if (r && r.ok) {
+    toast(`✅ ${r.imported} importados, ${r.updated} atualizados`, 'success');
+    loadMyContacts();
+  }
+}

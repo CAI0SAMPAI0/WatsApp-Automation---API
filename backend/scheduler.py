@@ -6,7 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.redis import RedisJobStore
 from sqlalchemy.orm import Session
 
-from database import SessionLocal, Task, TaskStatus
+from database import SessionLocal, Task, TaskStatus, Contact
 from evolution import enviar_texto, enviar_midia_url, enviar_midia_base64, resolver_destino
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,6 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 
 # ── parse seguro da URL do Redis ──────────────────────────────────────────────
 def _redis_host_port(url: str):
-    # suporta redis://host:port e redis://:password@host:port
     url = url.replace("redis://", "")
     if "@" in url:
         url = url.split("@", 1)[1]
@@ -41,7 +40,13 @@ scheduler = AsyncIOScheduler(
 
 
 async def executar_task(task_id: int):
-    """Executa um envio e atualiza o status no banco."""
+    """
+    Executa um envio e atualiza o status no banco.
+
+    Resolução do destinatário:
+      1. Busca contatos do cliente no banco (rápido, sem HTTP)
+      2. Passa para resolver_destino() que tenta banco → grupos → contatos Evolution
+    """
     db: Session = SessionLocal()
     task = None
     try:
@@ -56,15 +61,22 @@ async def executar_task(task_id: int):
         task.status = TaskStatus.running
         db.commit()
 
-        numero = await resolver_destino(task.target.strip())
+        # ── carrega contatos do cliente para resolução local ───────────────
+        db_contacts = (
+            db.query(Contact)
+            .filter(Contact.client_id == task.client_id)
+            .all()
+        )
+
+        numero = await resolver_destino(task.target.strip(), db_contacts=db_contacts)
         logger.info(f"[DEBUG] Destino resolvido: '{task.target}' → '{numero}'")
-        modo   = task.mode.value if hasattr(task.mode, "value") else task.mode
+
+        modo = task.mode.value if hasattr(task.mode, "value") else task.mode
 
         if modo == "text":
             await enviar_texto(numero, task.message or "")
 
         elif modo == "file":
-            # file_path pode ser URL ou base64
             fp = task.file_path or ""
             if fp.startswith("http"):
                 await enviar_midia_url(numero, fp, "document")
@@ -74,13 +86,11 @@ async def executar_task(task_id: int):
         elif modo == "file_text":
             fp = task.file_path or ""
             if fp.startswith("http"):
-                await enviar_midia_url(numero, fp, "document",
-                                       legenda=task.message or "")
+                await enviar_midia_url(numero, fp, "document", legenda=task.message or "")
             else:
-                await enviar_midia_base64(numero, fp, "document", "arquivo",
-                                          legenda=task.message or "")
+                await enviar_midia_base64(numero, fp, "document", "arquivo", legenda=task.message or "")
 
-        task.status     = TaskStatus.completed
+        task.status      = TaskStatus.completed
         task.executed_at = datetime.now(timezone.utc)
         db.commit()
         logger.info(f"✅ Task {task_id} concluída → {numero}")
@@ -103,13 +113,11 @@ def agendar_task(task_id: int, scheduled_time: datetime, is_daily: bool = False,
     """
     job_id = f"task_{task_id}"
 
-    # garante que o datetime tem timezone (assume UTC se naive)
     if scheduled_time.tzinfo is None:
         scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
 
-    # converte para horário de Brasília para o cron/date trigger
-    brt = timezone(timedelta(hours=-3))
-    dt_brt = scheduled_time.astimezone(brt)
+    brt     = timezone(timedelta(hours=-3))
+    dt_brt  = scheduled_time.astimezone(brt)
 
     if is_daily:
         days = "mon-fri" if not include_weekends else "mon-sun"

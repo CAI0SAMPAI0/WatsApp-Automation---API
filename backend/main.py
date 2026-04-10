@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 import os as os_module
+import httpx
 
 from database import (
     init_db, get_db,
@@ -36,7 +37,10 @@ from auth import (
     ADMIN_KEY
 )
 from notifier import send_error_email, send_error_webhook, send_resolved_email
-from evolution import get_qrcode, get_status, criar_instancia, resolver_contatos
+from evolution import (
+    get_qrcode, get_status, criar_instancia, resolver_contatos,
+    EVOLUTION_URL, HEADERS, INSTANCE
+)
 from scheduler import scheduler, agendar_task, cancelar_task
 
 # ── app ───────────────────────────────────────────────────────────────────────
@@ -81,11 +85,15 @@ def check_admin(x_admin_key: str = Header(None)):
         raise HTTPException(status_code=403, detail="Admin key inválida")
 
 def _norm(t):
-    if not t: return ""
-    return unicodedata.normalize("NFD", str(t)).encode("ascii","ignore").decode("ascii").lower().strip()
+    if not t:
+        return ""
+    return unicodedata.normalize("NFD", str(t)).encode("ascii", "ignore").decode("ascii").lower().strip()
 
 def _clean_phone(phone: str) -> str:
-    phone = phone.replace("+","").replace(" ","").replace("-","").replace("(","").replace(")","").replace(".","")
+    phone = (
+        phone.replace("+", "").replace(" ", "").replace("-", "")
+             .replace("(", "").replace(")", "").replace(".", "")
+    )
     if not phone.isdigit():
         return ""
     if len(phone) <= 11:
@@ -125,8 +133,11 @@ def create_client(payload: ClientCreate, db: Session = Depends(get_db), x_admin_
     db.add(client)
     db.commit()
     db.refresh(client)
-    return {"id": client.id, "name": client.name, "email": client.email, "secret_key": raw_secret,
-            "message": "Guarde o secret_key — configure no .env do agente"}
+    return {
+        "id": client.id, "name": client.name, "email": client.email,
+        "secret_key": raw_secret,
+        "message": "Guarde o secret_key — configure no .env do agente",
+    }
 
 @app.get("/admin/clients", response_model=List[ClientOut], tags=["admin"])
 def list_clients(db: Session = Depends(get_db), _: None = Depends(check_admin)):
@@ -144,8 +155,10 @@ def deactivate_client(client_id: int, db: Session = Depends(get_db), _: None = D
 @app.post("/admin/versions", response_model=dict, tags=["admin"])
 def create_version(payload: AgentVersionCreate, db: Session = Depends(get_db), _: None = Depends(check_admin)):
     db.query(AgentVersion).update({"is_current": False})
-    version = AgentVersion(version=payload.version, download_url=payload.download_url,
-                           changelog=payload.changelog, is_current=True)
+    version = AgentVersion(
+        version=payload.version, download_url=payload.download_url,
+        changelog=payload.changelog, is_current=True,
+    )
     db.add(version)
     db.commit()
     db.refresh(version)
@@ -175,12 +188,14 @@ def admin_stats(db: Session = Depends(get_db), _: None = Depends(check_admin)):
     completed = db.query(Task).filter(Task.status == TaskStatus.completed).count()
     failed    = db.query(Task).filter(Task.status == TaskStatus.failed).count()
     errors    = db.query(ErrorReport).filter(ErrorReport.is_resolved == False).count()
-    return DashboardStats(total_tasks=total, pending=pending, completed=completed,
-                          failed=failed, unresolved_errors=errors)
+    return DashboardStats(
+        total_tasks=total, pending=pending, completed=completed,
+        failed=failed, unresolved_errors=errors,
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  CONTACTS — cadastro manual + CSV
+#  CONTACTS — cadastro manual + CSV + sync WhatsApp
 # ══════════════════════════════════════════════════════════════════════════════
 
 @app.get("/panel/contacts", tags=["panel"])
@@ -196,6 +211,7 @@ async def list_contacts(
     db_contacts = db.query(Contact).filter(Contact.client_id == client.id).all()
     results = []
     numeros_ja = set()
+
     for c in db_contacts:
         if not q or q_norm in _norm(c.name) or q_norm in _norm(c.phone):
             results.append({"label": c.name, "value": c.phone, "tipo": "contato"})
@@ -239,7 +255,6 @@ def add_contact(
         Contact.phone == phone
     ).first()
     if existing:
-        # atualiza o nome se já existir
         existing.name = payload.name.strip()
         db.commit()
         db.refresh(existing)
@@ -301,7 +316,7 @@ async def import_contacts_csv(
     """Importa contatos de CSV. Aceita exportação do Google Contacts, Android, iPhone."""
     content = await file.read()
     try:
-        text = content.decode("utf-8-sig")  # utf-8-sig remove BOM
+        text = content.decode("utf-8-sig")
     except Exception:
         text = content.decode("latin-1")
 
@@ -310,20 +325,17 @@ async def import_contacts_csv(
     skipped  = 0
 
     for row in reader:
-        # tenta vários formatos de coluna
         name = (
             row.get("Name") or row.get("nome") or row.get("Nome") or
             row.get("First Name") or row.get("display_name") or
             row.get("Primeiro nome") or ""
         ).strip()
 
-        # junta primeiro + último nome se separados
         if not name:
             first = (row.get("First Name") or row.get("Primeiro nome") or "").strip()
-            last  = (row.get("Last Name") or row.get("Último nome") or "").strip()
+            last  = (row.get("Last Name")  or row.get("Último nome")   or "").strip()
             name  = f"{first} {last}".strip()
 
-        # tenta vários campos de telefone
         phone = ""
         for col in ["Phone", "telefone", "Telefone", "Phone 1 - Value",
                     "numero", "Número", "Mobile", "Celular", "Phone Number"]:
@@ -356,6 +368,67 @@ async def import_contacts_csv(
     return {"ok": True, "imported": imported, "skipped": skipped}
 
 
+@app.post("/panel/my-contacts/sync-whatsapp", tags=["panel"])
+async def sync_whatsapp_contacts(
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+):
+    """
+    Importa automaticamente todos os contatos do WhatsApp conectado via Evolution API.
+    Atualiza o nome se o número já existir, insere se for novo.
+    """
+    imported = 0
+    updated  = 0
+    skipped  = 0
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as http:
+            r = await http.post(
+                f"{EVOLUTION_URL}/chat/findContacts/{INSTANCE}",
+                headers=HEADERS,
+                json={},
+            )
+            if r.status_code != 200:
+                raise HTTPException(status_code=502, detail="Evolution API indisponível")
+            contacts = r.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erro ao conectar na Evolution API: {e}")
+
+    for c in contacts:
+        name = (c.get("pushName") or "").strip()
+        jid  = c.get("remoteJid", "")
+
+        # pula grupos, broadcasts e entradas sem nome
+        if not name or "@g.us" in jid or "broadcast" in jid:
+            skipped += 1
+            continue
+
+        phone = jid.replace("@s.whatsapp.net", "")
+        phone = _clean_phone(phone)
+        if not phone:
+            skipped += 1
+            continue
+
+        existing = db.query(Contact).filter(
+            Contact.client_id == client.id,
+            Contact.phone == phone
+        ).first()
+
+        if existing:
+            if existing.name != name:
+                existing.name = name
+                updated += 1
+        else:
+            db.add(Contact(client_id=client.id, name=name, phone=phone))
+            imported += 1
+
+    db.commit()
+    logger.info(f"Sync WhatsApp — cliente {client.id}: {imported} importados, {updated} atualizados, {skipped} ignorados")
+    return {"ok": True, "imported": imported, "updated": updated, "skipped": skipped}
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 #  AGENT
 # ══════════════════════════════════════════════════════════════════════════════
@@ -371,12 +444,16 @@ def check_version(
         raise HTTPException(status_code=404, detail="Nenhuma versão registrada")
 
     def parse_ver(v: str):
-        try: return tuple(int(x) for x in v.strip().split("."))
-        except: return (0, 0, 0)
+        try:
+            return tuple(int(x) for x in v.strip().split("."))
+        except:
+            return (0, 0, 0)
 
     needs_update = parse_ver(x_agent_version) < parse_ver(current.version)
-    return AgentVersionOut(version=current.version, download_url=current.download_url,
-                           changelog=current.changelog, needs_update=needs_update)
+    return AgentVersionOut(
+        version=current.version, download_url=current.download_url,
+        changelog=current.changelog, needs_update=needs_update,
+    )
 
 
 @app.get("/agent/tasks/pending", response_model=PendingTasksResponse, tags=["agent"])
@@ -424,20 +501,26 @@ async def report_error(
         if task:
             task_target = task.target
 
-    error = ErrorReport(client_id=client.id, task_id=payload.task_id,
-                        agent_version=payload.agent_version, error_type=payload.error_type,
-                        traceback=payload.traceback, screenshot=payload.screenshot)
+    error = ErrorReport(
+        client_id=client.id, task_id=payload.task_id,
+        agent_version=payload.agent_version, error_type=payload.error_type,
+        traceback=payload.traceback, screenshot=payload.screenshot,
+    )
     db.add(error)
     db.commit()
     db.refresh(error)
 
-    background_tasks.add_task(send_error_email, client_name=client.name,
-                              error_type=payload.error_type or "Desconhecido",
-                              traceback=payload.traceback or "", agent_version=payload.agent_version or "?",
-                              error_id=error.id, task_target=task_target)
-    background_tasks.add_task(send_error_webhook, client_name=client.name,
-                              error_type=payload.error_type or "Desconhecido",
-                              agent_version=payload.agent_version or "?", error_id=error.id)
+    background_tasks.add_task(
+        send_error_email, client_name=client.name,
+        error_type=payload.error_type or "Desconhecido",
+        traceback=payload.traceback or "", agent_version=payload.agent_version or "?",
+        error_id=error.id, task_target=task_target,
+    )
+    background_tasks.add_task(
+        send_error_webhook, client_name=client.name,
+        error_type=payload.error_type or "Desconhecido",
+        agent_version=payload.agent_version or "?", error_id=error.id,
+    )
     return {"ok": True, "error_id": error.id}
 
 
@@ -451,7 +534,11 @@ def list_tasks(client: Client = Depends(get_current_client), db: Session = Depen
 
 
 @app.post("/panel/tasks", response_model=TaskOut, tags=["panel"])
-def create_task(payload: TaskCreate, client: Client = Depends(get_current_client), db: Session = Depends(get_db)):
+def create_task(
+    payload: TaskCreate,
+    client: Client = Depends(get_current_client),
+    db: Session = Depends(get_db),
+):
     task = Task(
         client_id=client.id,
         task_name=f"task_{client.id}_{int(datetime.utcnow().timestamp())}",
@@ -568,8 +655,10 @@ def my_stats(client: Client = Depends(get_current_client), db: Session = Depends
     errors    = db.query(ErrorReport).filter(
         ErrorReport.client_id == cid, ErrorReport.is_resolved == False
     ).count()
-    return DashboardStats(total_tasks=total, pending=pending, completed=completed,
-                          failed=failed, unresolved_errors=errors)
+    return DashboardStats(
+        total_tasks=total, pending=pending, completed=completed,
+        failed=failed, unresolved_errors=errors,
+    )
 
 
 @app.get("/panel/qrcode", tags=["panel"])
