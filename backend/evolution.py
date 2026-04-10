@@ -1,5 +1,9 @@
-import os
+﻿import unicodedata
+import logging
 import httpx
+import os
+
+logger = logging.getLogger(__name__)
 
 EVOLUTION_URL = os.environ.get("EVOLUTION_URL", "http://localhost:8080")
 EVOLUTION_KEY = os.environ.get("EVOLUTION_KEY", "")
@@ -12,8 +16,61 @@ HEADERS = {
 
 
 def _fmt_numero(numero: str) -> str:
-    """Remove +, espaços e traços. Ex: +55 11 99999-9999 → 5511999999999"""
     return numero.strip().replace("+", "").replace(" ", "").replace("-", "")
+
+
+def _normalizar(texto: str) -> str:
+    return unicodedata.normalize("NFD", texto).encode("ascii", "ignore").decode("ascii").lower().strip()
+
+
+async def resolver_destino(nome_ou_numero: str) -> str:
+    nome = nome_ou_numero.strip()
+    if "@" in nome or nome.replace("+", "").isdigit():
+        return nome.replace("+", "")
+
+    nome_norm = _normalizar(nome)
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(
+                f"{EVOLUTION_URL}/group/fetchAllGroups/{INSTANCE}",
+                headers=HEADERS,
+                params={"getParticipants": "false"},
+            )
+            if r.status_code == 200:
+                for g in r.json():
+                    if nome_norm == _normalizar(g.get("subject", "")):
+                        return g["id"]
+                for g in r.json():
+                    if nome_norm in _normalizar(g.get("subject", "")):
+                        return g["id"]
+    except Exception:
+        pass
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                f"{EVOLUTION_URL}/chat/findContacts/{INSTANCE}",
+                headers=HEADERS,
+                json={},
+            )
+            if r.status_code == 200:
+                exatos = []
+                parciais = []
+                for c in r.json():
+                    push_norm = _normalizar(c.get("pushName", ""))
+                    if push_norm == nome_norm:
+                        exatos.append(c)
+                    elif push_norm.startswith(nome_norm):
+                        parciais.append(c)
+                if exatos:
+                    return exatos[0]["remoteJid"]
+                if parciais:
+                    return parciais[0]["remoteJid"]
+    except Exception:
+        pass
+
+    return nome
 
 
 async def criar_instancia():
@@ -27,14 +84,12 @@ async def criar_instancia():
                 "qrcode": True,
             },
         )
-        # 409 = já existe, tudo bem
         if r.status_code not in (200, 201, 409):
             r.raise_for_status()
         return r.json()
 
 
 async def get_qrcode() -> dict:
-    """Retorna base64 do QR Code para escanear."""
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.get(
             f"{EVOLUTION_URL}/instance/connect/{INSTANCE}",
@@ -66,14 +121,7 @@ async def enviar_texto(numero: str, mensagem: str) -> dict:
         return r.json()
 
 
-async def enviar_midia_url(
-    numero: str,
-    url: str,
-    tipo: str,          # "image" | "document" | "video" | "audio"
-    legenda: str = "",
-    nome_arquivo: str = "arquivo",
-) -> dict:
-    """Envia mídia a partir de URL pública."""
+async def enviar_midia_url(numero, url, tipo, legenda="", nome_arquivo="arquivo"):
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(
             f"{EVOLUTION_URL}/message/sendMedia/{INSTANCE}",
@@ -90,14 +138,7 @@ async def enviar_midia_url(
         return r.json()
 
 
-async def enviar_midia_base64(
-    numero: str,
-    base64_data: str,   # sem prefixo "data:..."
-    tipo: str,          # "image" | "document" | "video" | "audio"
-    nome_arquivo: str,
-    legenda: str = "",
-) -> dict:
-    """Envia mídia em base64 — útil quando não há URL pública."""
+async def enviar_midia_base64(numero, base64_data, tipo, nome_arquivo, legenda=""):
     async with httpx.AsyncClient(timeout=60) as client:
         r = await client.post(
             f"{EVOLUTION_URL}/message/sendMedia/{INSTANCE}",

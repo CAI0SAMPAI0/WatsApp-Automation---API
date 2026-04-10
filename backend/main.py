@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
-load_dotenv()
+from pathlib import Path
+load_dotenv(Path(__file__).parent / ".env", override=True)
 
 import logging
 from datetime import datetime, timedelta
@@ -68,7 +69,7 @@ app.add_middleware(
 # ── Servir arquivos estáticos (HTML/CSS/JS) ─────────────────────────────────
 ui_path = os_module.path.join(os_module.path.dirname(__file__), "..", "ui", "web")
 if os_module.path.exists(ui_path):
-    app.mount("/", StaticFiles(directory=ui_path, html=True), name="static")
+    app.mount("/manage", StaticFiles(directory=ui_path, html=True), name="static")
     logger.info(f"✅ UI estática montada em /manage → {ui_path}")
 else:
     logger.warning(f"⚠️  Pasta UI não encontrada: {ui_path}")

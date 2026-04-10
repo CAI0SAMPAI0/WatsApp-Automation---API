@@ -56,7 +56,9 @@ async def executar_task(task_id: int):
         task.status = TaskStatus.running
         db.commit()
 
-        numero = task.target.strip().replace("+", "").replace(" ", "").replace("-", "")
+        from evolution import resolver_destino
+        numero = await resolver_destino(task.target.strip())
+        logger.info(f"[DEBUG] Destino resolvido: '{task.target}' → '{numero}'")
         modo   = task.mode.value if hasattr(task.mode, "value") else task.mode
 
         if modo == "text":
