@@ -1,12 +1,18 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys')
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+  Browsers
+} = require('@whiskeysockets/baileys')
 const { Boom } = require('@hapi/boom')
 const express = require('express')
-const qrcode  = require('qrcode')
-const P       = require('pino')
-const fs      = require('fs')
-const path    = require('path')
+const qrcode = require('qrcode')
+const P = require('pino')
+const fs = require('fs')
+const path = require('path')
 
-const app  = express()
+const app = express()
 const PORT = process.env.PORT || 3000
 const API_KEY = process.env.API_KEY || 'minha-chave-secreta'
 
@@ -21,10 +27,12 @@ app.use((req, res, next) => {
 })
 
 // ── estado global ─────────────────────────────────────────────────────────
-let sock        = null
-let qrCodeData  = null   // base64 da imagem PNG do QR
+let sock = null
+let qrCodeData = null
 let isConnected = false
 let isConnecting = false
+let reconnectAttempts = 0
+const MAX_RECONNECT_DELAY = 30000
 
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, 'auth_info')
 
@@ -40,17 +48,20 @@ async function connectToWhatsApp() {
 
   sock = makeWASocket({
     version,
-    auth:   state,
+    auth: state,
     logger: P({ level: 'silent' }),
     printQRInTerminal: true,
-    browser: ['Chrome (Linux)', 'Chrome', '121.0.0'],
+    // Browsers.macOS é o fingerprint mais aceito pelo WhatsApp
+    browser: Browsers.macOS('Desktop'),
     syncFullHistory: false,
+    connectTimeoutMs: 60_000,
+    keepAliveIntervalMs: 25_000,
+    retryRequestDelayMs: 2_000,
+    defaultQueryTimeoutMs: 60_000,
   })
 
-  // salva credenciais sempre que atualizar
   sock.ev.on('creds.update', saveCreds)
 
-  // QR Code
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
 
@@ -64,45 +75,48 @@ async function connectToWhatsApp() {
       console.log('[Baileys] ✅ Conectado ao WhatsApp!')
       isConnected = true
       isConnecting = false
-      qrCodeData   = null
+      reconnectAttempts = 0
+      qrCodeData = null
     }
 
     if (connection === 'close') {
-      isConnected  = false
+      isConnected = false
       isConnecting = false
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode
 
-      console.log(`[Baileys] Conexão fechada. Razão: ${reason}`)
+      const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode
+      console.log(`[Baileys] Conexão fechada. Razão: ${statusCode}`)
 
-      // reconecta em tudo, exceto logout
-      if (reason === DisconnectReason.loggedOut) {
+      if (statusCode === DisconnectReason.loggedOut) {
         console.log('[Baileys] Logout detectado — removendo sessão...')
         fs.rmSync(AUTH_DIR, { recursive: true, force: true })
-        setTimeout(connectToWhatsApp, 2000)
-      } else {
-        setTimeout(connectToWhatsApp, 3000)
+        reconnectAttempts = 0
+        setTimeout(connectToWhatsApp, 3_000)
+        return
       }
+
+      // back-off exponencial: 3s, 6s, 12s … até 30s
+      reconnectAttempts++
+      const delay = Math.min(3_000 * Math.pow(2, reconnectAttempts - 1), MAX_RECONNECT_DELAY)
+      console.log(`[Baileys] Reconectando em ${delay / 1000}s (tentativa ${reconnectAttempts})...`)
+      setTimeout(connectToWhatsApp, delay)
     }
   })
 }
 
-// ── inicializa ────────────────────────────────────────────────────────────
 connectToWhatsApp()
 
 // ══════════════════════════════════════════════════════════════════════════
 // ROTAS
 // ══════════════════════════════════════════════════════════════════════════
 
-// GET /status — verificar conexão
 app.get('/status', (req, res) => {
   res.json({
-    connected:   isConnected,
-    hasQR:       !!qrCodeData,
-    phone:       sock?.user?.id || null,
+    connected: isConnected,
+    hasQR: !!qrCodeData,
+    phone: sock?.user?.id || null,
   })
 })
 
-// GET /qrcode — retorna página HTML com QR Code para escanear
 app.get('/qrcode', (req, res) => {
   if (isConnected) {
     return res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
@@ -113,8 +127,8 @@ app.get('/qrcode', (req, res) => {
   if (!qrCodeData) {
     return res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
       <h2>⏳ Gerando QR Code...</h2>
-      <p>Aguarde e recarregue a página em 3 segundos.</p>
-      <script>setTimeout(()=>location.reload(),3000)</script>
+      <p>Aguarde e recarregue a página em 5 segundos.</p>
+      <script>setTimeout(()=>location.reload(),5000)</script>
     </body></html>`)
   }
   res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#fff">
@@ -132,13 +146,10 @@ app.get('/qrcode', (req, res) => {
   </body></html>`)
 })
 
-// POST /send/text — enviar texto
 app.post('/send/text', async (req, res) => {
   if (!isConnected) return res.status(503).json({ error: 'WhatsApp não conectado' })
-
   const { number, message } = req.body
   if (!number || !message) return res.status(400).json({ error: 'number e message são obrigatórios' })
-
   try {
     const jid = formatJID(number)
     await sock.sendMessage(jid, { text: message })
@@ -150,18 +161,14 @@ app.post('/send/text', async (req, res) => {
   }
 })
 
-// POST /send/media — enviar mídia (imagem, vídeo, documento, áudio)
 app.post('/send/media', async (req, res) => {
   if (!isConnected) return res.status(503).json({ error: 'WhatsApp não conectado' })
-
   const { number, media_url, media_base64, mimetype, filename, caption, media_type } = req.body
   if (!number) return res.status(400).json({ error: 'number é obrigatório' })
-
   try {
-    const jid      = formatJID(number)
-    const msgType  = media_type || 'document'
-    let   content  = {}
-
+    const jid = formatJID(number)
+    const msgType = media_type || 'document'
+    let content = {}
     if (media_base64) {
       const buffer = Buffer.from(media_base64, 'base64')
       content = buildMediaContent(msgType, buffer, mimetype, filename, caption)
@@ -170,7 +177,6 @@ app.post('/send/media', async (req, res) => {
     } else {
       return res.status(400).json({ error: 'media_url ou media_base64 é obrigatório' })
     }
-
     await sock.sendMessage(jid, content)
     console.log(`[OK] Mídia (${msgType}) enviada para ${number}`)
     res.json({ ok: true, jid })
@@ -180,43 +186,34 @@ app.post('/send/media', async (req, res) => {
   }
 })
 
-// DELETE /logout — desconectar e limpar sessão
 app.delete('/logout', async (req, res) => {
-  try {
-    await sock?.logout()
-  } catch (_) {}
+  try { await sock?.logout() } catch (_) { }
   fs.rmSync(AUTH_DIR, { recursive: true, force: true })
   isConnected = false
   res.json({ ok: true, message: 'Sessão encerrada. Reconectando...' })
-  setTimeout(connectToWhatsApp, 2000)
+  setTimeout(connectToWhatsApp, 2_000)
 })
 
 // ── helpers ───────────────────────────────────────────────────────────────
 function formatJID(number) {
-  // aceita: "5511999999999", "5511999999999@s.whatsapp.net", "NomeGrupo@g.us"
   if (number.includes('@')) return number
   const clean = number.replace(/\D/g, '')
   return `${clean}@s.whatsapp.net`
 }
 
 function buildMediaContent(type, source, mimetype, filename, caption) {
-  const base = typeof source === 'object' && source.url
-    ? { url: source.url }
-    : source   // Buffer
-
-  if (type === 'image')    return { image:    base, caption: caption || '', mimetype }
-  if (type === 'video')    return { video:    base, caption: caption || '', mimetype }
-  if (type === 'audio')    return { audio:    base, mimetype: mimetype || 'audio/mp4', ptt: false }
-  // default: document
+  const base = (typeof source === 'object' && source.url) ? { url: source.url } : source
+  if (type === 'image') return { image: base, caption: caption || '', mimetype }
+  if (type === 'video') return { video: base, caption: caption || '', mimetype }
+  if (type === 'audio') return { audio: base, mimetype: mimetype || 'audio/mp4', ptt: false }
   return {
     document: base,
     mimetype: mimetype || 'application/octet-stream',
     fileName: filename || 'arquivo',
-    caption:  caption  || '',
+    caption: caption || '',
   }
 }
 
-// ── start ─────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`[Baileys API] Rodando na porta ${PORT}`)
   console.log(`[Baileys API] QR Code: http://localhost:${PORT}/qrcode`)
