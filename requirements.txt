@@ -1,12 +1,5 @@
-# ── API e HTTP ─────────────────────────────────────────────────────────────
 requests>=2.31.0
 python-dotenv>=1.0.0
-
-# ── agendamento (substitui windows Task Scheduler no Railway/Linux) ─────────
 apscheduler>=3.10.0
-
-# ── banco de dados ──────────────────────────────────────────────────────────
-# SQLite já vem no Python — sem dependência extra
-
-# ── utilitários ────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.0
 psutil>=5.9.0
