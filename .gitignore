@@ -1,7 +1,7 @@
 .venv/
 .vscode/
+.env
 # Cache Python
 __pycache__/
 *.py[cod]
 *$py.class
-.env
