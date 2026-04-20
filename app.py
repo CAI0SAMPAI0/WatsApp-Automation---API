@@ -1,80 +1,51 @@
-import sys
+"""
+app.py — Entrypoint no Railway (sem UI, sem Playwright).
+Inicia o scheduler APScheduler e mantém o processo vivo.
+"""
+
 import os
+import sys
+import time
+import signal
+import logging
 
-def _get_executor_json():
-    """
-    Lê --executor-json do sys.argv manualmente.
-    argparse pode falhar com paths com espaços no Windows mesmo com aspas.
-    """
-    argv = sys.argv[1:]
-    for i, arg in enumerate(argv):
-        if arg == "--executor-json" and i + 1 < len(argv):
-            return argv[i + 1]
-        if arg.startswith("--executor-json="):
-            return arg.split("=", 1)[1]
-    return None
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(levelname)s] %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("app")
 
-_EXECUTOR_JSON = _get_executor_json()
 
-# Se estamos em modo executor, seta a variável e executa direto
-if _EXECUTOR_JSON:
-    os.environ["EXECUTOR_MODE"] = "1"
-    # muda para o diretório base antes de qualquer import de core
-    if getattr(sys, 'frozen', False):
-        os.chdir(os.path.dirname(os.path.abspath(sys.executable)))
-    else:
-        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+def main():
+    from core.db        import get_db
+    from core.scheduler import get_scheduler, shutdown
 
-    import io
-    if sys.stdout and hasattr(sys.stdout, "buffer"):
-        try:
-            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-        except Exception:
-            pass
-    if sys.stderr and hasattr(sys.stderr, "buffer"):
-        try:
-            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+    logger.info("=" * 60)
+    logger.info("Study Practices — iniciando no Railway")
+    logger.info("=" * 60)
 
-    # importa e executa — nenhum import de UI aconteceu até aqui
-    sys.path.insert(0, os.getcwd())
-    from executor import main as executor_main
-    executor_main(_EXECUTOR_JSON)
-    sys.exit(0)
+    # inicializa banco
+    db = get_db()
+    logger.info("Banco de dados OK.")
 
-# ── MODO GUI ─────────────────────────────────────────────────────────────────
-# Só chega aqui se NÃO for modo executor
-import multiprocessing
+    # inicia o scheduler (APScheduler em background)
+    sched = get_scheduler()
+    logger.info("Scheduler iniciado.")
+
+    # encerramento limpo com SIGTERM (Railway envia isso ao fazer deploy)
+    def _shutdown(sig, frame):
+        logger.info("Sinal recebido, encerrando...")
+        shutdown()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT,  _shutdown)
+
+    logger.info("Aguardando tarefas agendadas... (Ctrl+C para encerrar)")
+    while True:
+        time.sleep(30)
+
 
 if __name__ == "__main__":
-    multiprocessing.freeze_support()
-
-    import io
-    from datetime import datetime
-
-    # stdout UTF-8
-    if sys.stdout and hasattr(sys.stdout, "buffer"):
-        try:
-            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-        except Exception:
-            pass
-
-    from core.paths import get_app_base_dir, get_whatsapp_profile_dir
-
-    BASE_DIR    = get_app_base_dir()
-    PROFILE_DIR = get_whatsapp_profile_dir()
-    os.chdir(BASE_DIR)
-
-    with open(os.path.join(BASE_DIR, "last_run_path.txt"), "a") as f:
-        f.write(f"{datetime.now()}: Rodando em {BASE_DIR} | Perfil: {PROFILE_DIR}\n")
-
-    try:
-        from ui.main_window import App
-        app = App()
-        app.mainloop()
-    except Exception as e:
-        import traceback
-        with open(os.path.join(BASE_DIR, "erro_fatal.txt"), "a", encoding="utf-8") as f:
-            f.write(f"[{datetime.now()}] {traceback.format_exc()}\n")
-        raise
+    main()

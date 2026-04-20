@@ -1,2 +1,7 @@
+[build]
+builder = "NIXPACKS"
+
 [deploy]
-startCommand = "node dist/main.js"
+startCommand = "python app.py"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

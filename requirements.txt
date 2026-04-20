@@ -1,13 +1,12 @@
-# ── interface ──────────────────────────────────────────────────────
-pywebview>=4.4.1          # substitui CustomTkinter — janela nativa com HTML/CSS/JS
+# ── API e HTTP ─────────────────────────────────────────────────────────────
+requests>=2.31.0
+python-dotenv>=1.0.0
 
-# ── automação ──────────────────────────────────────────────────────
-playwright>=1.41.0
+# ── agendamento (substitui windows Task Scheduler no Railway/Linux) ─────────
+apscheduler>=3.10.0
 
-# ── sistema ────────────────────────────────────────────────────────
-pyperclip>=1.8.2
+# ── banco de dados ──────────────────────────────────────────────────────────
+# SQLite já vem no Python — sem dependência extra
+
+# ── utilitários ────────────────────────────────────────────────────────────
 psutil>=5.9.0
-Pillow>=10.2.0            # opcional: thumbnails de imagem
-
-# ── build ──────────────────────────────────────────────────────────
-pyinstaller>=6.4.0
