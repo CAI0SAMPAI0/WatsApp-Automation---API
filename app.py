@@ -7,7 +7,8 @@ import os
 import sys
 import signal
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -62,7 +63,10 @@ def create_task():
             return jsonify({"error": f"Campo obrigatório: {f}"}), 400
 
     try:
-        dt = datetime.fromisoformat(data["scheduled_time"])
+        raw = data["scheduled_time"].replace("Z", "+00:00")
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
     except Exception:
         return jsonify({"error": "scheduled_time inválido. Use ISO: 2026-04-21T15:30:00"}), 400
     
