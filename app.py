@@ -62,6 +62,8 @@ def create_task():
         if f not in data:
             return jsonify({"error": f"Campo obrigatório: {f}"}), 400
 
+    from zoneinfo import ZoneInfo
+    from datetime import datetime
     try:
         raw = data["scheduled_time"].replace("Z", "+00:00")
         dt = datetime.fromisoformat(raw)
@@ -70,8 +72,7 @@ def create_task():
     except Exception:
         return jsonify({"error": "scheduled_time inválido. Use ISO: 2026-04-21T15:30:00"}), 400
     
-    from zoneinfo import ZoneInfo
-    from datetime import datetime
+    
 
     BRASILIA = ZoneInfo("America/Sao_Paulo")
 
