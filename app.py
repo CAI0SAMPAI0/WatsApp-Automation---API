@@ -17,8 +17,10 @@ logging.basicConfig(
 logger = logging.getLogger("app")
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 flask_app = Flask(__name__)
+CORS(flask_app)
 
 API_KEY = os.environ.get("APP_API_KEY", "minha-chave-secreta")
 
