@@ -63,8 +63,9 @@ def create_task():
         dt = datetime.fromisoformat(data["scheduled_time"])
     except Exception:
         return jsonify({"error": "scheduled_time inválido. Use ISO: 2026-04-21T15:30:00"}), 400
-
-    if dt < datetime.now() and not data.get("daily"):
+    
+    from zoneinfo import ZoneInfo
+    if dt < datetime.now(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None) and not data.get("daily"):
         return jsonify({"error": "Data/hora no passado"}), 400
 
     task_name = f"ZapTask_{int(datetime.now().timestamp())}"
