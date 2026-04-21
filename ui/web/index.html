@@ -1582,15 +1582,20 @@
     }
 
     // ── DATE HELPERS ─────────────────────────────────────────────────────────
+    function _brtDate() {
+      return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    }
     function todayStr() {
-      return new Date().toISOString().split('T')[0];
+      const d = _brtDate(), p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
     }
     function nowPlusMins(m) {
-      const d = new Date(Date.now() + m * 60000);
-      return d.toTimeString().slice(0, 5);
+      const d = _brtDate(), p = n => String(n).padStart(2, '0');
+      d.setMinutes(d.getMinutes() + m);
+      return `${p(d.getHours())}:${p(d.getMinutes())}`;
     }
     function toISO(dateStr, timeStr) {
-      return `${dateStr}T${timeStr}:00`;
+      return `${dateStr}T${timeStr}:00-03:00`;  // ← offset fixo Brasília
     }
 
     // ── VALIDAÇÃO ─────────────────────────────────────────────────────────────

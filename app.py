@@ -80,7 +80,8 @@ def create_task():
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=BRASILIA)
 
-    if dt < datetime.now(BRASILIA) and not data.get("daily"):
+    TOLERANCE = timedelta(minutes=2)
+    if dt < datetime.now(BRASILIA) - TOLERANCE and not data.get("daily"):
         return jsonify({"error": "Data/hora no passado"}), 400
 
     task_name = f"ZapTask_{int(datetime.now().timestamp())}"
