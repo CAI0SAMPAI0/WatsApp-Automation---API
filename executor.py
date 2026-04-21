@@ -7,7 +7,6 @@ from datetime import datetime
 
 os.environ["EXECUTOR_MODE"] = "1"
 
-# Configuração de encoding para Windows
 if sys.platform == "win32":
     for _s in (sys.stdout, sys.stderr):
         if _s:
@@ -20,7 +19,6 @@ if sys.platform == "win32":
                 else:
                     sys.stderr = io.TextIOWrapper(_s.buffer, encoding="utf-8", errors="replace")
 
-# Definição do diretório base
 if getattr(sys, "frozen", False):
     BASE_DIR = Path(sys.executable).parent.absolute()
 else:
@@ -28,13 +26,17 @@ else:
 
 sys.path.insert(0, str(BASE_DIR))
 
-# Imports do projeto
 from core.db     import get_db
 from core.logger import get_logger
 from services.baileys_api import BaileysAPI
 
 def executar_via_baileys(dados: dict, logger) -> dict:
     api       = BaileysAPI()
+    
+    # LOG PARA DIAGNÓSTICO DE URL
+    logger.info(f"[DIAGNÓSTICO] Conectando em: {api.base_url}")
+    print(f"[EXECUTOR] Usando API em: {api.base_url}", file=sys.stderr)
+
     target    = dados["target"].strip()
     mode      = dados["mode"]
     message   = (dados.get("message") or "").strip()
@@ -43,8 +45,15 @@ def executar_via_baileys(dados: dict, logger) -> dict:
     logger.info(f"Enviando para '{target}' | modo={mode}")
 
     if not api.is_connected():
+        # Verificando o porquê de não estar conectado
+        try:
+            status_real = api.status()
+            logger.error(f"[DIAGNÓSTICO] Status retornado pela API: {status_real}")
+        except Exception as e:
+            logger.error(f"[DIAGNÓSTICO] Falha ao obter status da API: {e}")
+
         raise RuntimeError(
-            "Baileys não está conectado. "
+            f"Baileys não está conectado em {api.base_url}. "
             "Acesse /qrcode no serviço Baileys e escaneie o QR Code."
         )
 
@@ -126,11 +135,9 @@ def main(json_path: str):
         sys.exit(0)
 
     except Exception as e:
-        # LOG NO ARQUIVO
         logger.error("[ERRO] ERRO NA EXECUÇÃO:")
         logger.error(traceback.format_exc())
 
-        # LOG NO CONSOLE (Para o Railway capturar)
         print("\n" + "!"*20 + " TRACEBACK DETALHADO " + "!"*20, file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
         print("!"*60 + "\n", file=sys.stderr)
@@ -156,7 +163,6 @@ if __name__ == "__main__":
     try:
         main(sys.argv[1])
     except Exception:
-        # Captura erros antes do logger (ex: erro no get_db ou get_logger)
         print("\nFALHA CRÍTICA NA INICIALIZAÇÃO DO EXECUTOR:", file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
         sys.exit(1)
