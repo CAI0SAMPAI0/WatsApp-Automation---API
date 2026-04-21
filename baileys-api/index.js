@@ -1,16 +1,19 @@
-const {
-  default: makeWASocket,
+import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   Browsers
-} = require('@whiskeysockets/baileys')
-const { Boom } = require('@hapi/boom')
-const express = require('express')
-const qrcode = require('qrcode')
-const P = require('pino')
-const fs = require('fs')
-const path = require('path')
+} from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import express from 'express'
+import qrcode from 'qrcode'
+import P from 'pino'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const app = express()
 const PORT = process.env.PORT || 3000
