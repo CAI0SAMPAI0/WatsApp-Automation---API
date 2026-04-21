@@ -8,6 +8,7 @@ import logging
 import subprocess
 import sys
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -29,7 +30,7 @@ def get_scheduler() -> BackgroundScheduler:
     global _scheduler
     if _scheduler is None:
         # sem jobstore persistente — jobs ficam em memória
-        _scheduler = BackgroundScheduler(timezone="UTC")
+        _scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
         _scheduler.start()
         logger.info("APScheduler iniciado (in-memory, UTC).")
     return _scheduler
@@ -94,9 +95,9 @@ def create_task(
 
         # garante que scheduled_time está em UTC
         if scheduled_time.tzinfo is None:
-            scheduled_time = scheduled_time.replace(tzinfo=timezone.utc)
+            scheduled_time = scheduled_time.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
 
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(ZoneInfo("America/Sao_Paulo"))
         logger.info(f"[SCHEDULER] now_utc={now_utc} | scheduled={scheduled_time} | diff={scheduled_time - now_utc}")
 
         if daily:
@@ -105,10 +106,10 @@ def create_task(
                 day_of_week=days_of_week,
                 hour=scheduled_time.hour,
                 minute=scheduled_time.minute,
-                timezone="UTC",
+                timezone="America/Sao_Paulo",
             )
         else:
-            trigger = DateTrigger(run_date=scheduled_time, timezone="UTC")
+            trigger = DateTrigger(run_date=scheduled_time, timezone="America/Sao_Paulo")
 
         sched.add_job(
             _run_executor,
