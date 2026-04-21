@@ -1,317 +1,1868 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Study Practices</title>
-  <link rel="stylesheet" href="styles.css"/>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap"
+    rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg2: #111118;
+      --bg3: #18181f;
+      --surface: #1e1e28;
+      --surface2: #252532;
+      --border: rgba(255, 255, 255, .06);
+      --border2: rgba(255, 255, 255, .12);
+      --accent: #7c6cfa;
+      --accent2: #a599ff;
+      --accent3: #5a4de0;
+      --green: #3dd68c;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --blue: #60a5fa;
+      --text: #f0eeff;
+      --text2: #9b96b8;
+      --text3: #504d68;
+      --radius: 14px;
+      --radius-s: 8px;
+      --radius-xs: 5px;
+      --font-display: 'Syne', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      --sidebar: 240px;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body)
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background: radial-gradient(ellipse 70% 50% at 10% 0%, rgba(124, 108, 250, .12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 90% 100%, rgba(61, 214, 140, .06) 0%, transparent 60%);
+    }
+
+    /* ── LAYOUT ── */
+    #app {
+      display: flex;
+      height: 100vh;
+      position: relative;
+      z-index: 1
+    }
+
+    /* ── SIDEBAR ── */
+    aside {
+      width: var(--sidebar);
+      flex-shrink: 0;
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .logo {
+      padding: 24px 20px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-mark {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent3), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    .logo-text {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      line-height: 1.2
+    }
+
+    .logo-text span {
+      display: block;
+      color: var(--text2);
+      font-weight: 400;
+      font-size: 11px;
+      margin-top: 1px
+    }
+
+    nav {
+      flex: 1;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto
+    }
+
+    .nav-section {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text3);
+      padding: 12px 8px 6px;
+      margin-top: 4px
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text2);
+      transition: background .15s, color .15s;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+    }
+
+    .nav-item:hover {
+      background: var(--surface);
+      color: var(--text)
+    }
+
+    .nav-item.active {
+      background: rgba(124, 108, 250, .15);
+      color: var(--accent2);
+      font-weight: 500
+    }
+
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      opacity: .7
+    }
+
+    .nav-item.active svg {
+      opacity: 1
+    }
+
+    .nav-badge {
+      margin-left: auto;
+      background: var(--accent3);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 20px;
+      min-width: 18px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      padding: 16px 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--surface);
+      border-radius: var(--radius-s);
+      font-size: 12px;
+      color: var(--text2);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text3);
+      flex-shrink: 0;
+      transition: background .3s
+    }
+
+    .status-dot.on {
+      background: var(--green);
+      box-shadow: 0 0 6px rgba(61, 214, 140, .5)
+    }
+
+    .status-dot.off {
+      background: var(--red)
+    }
+
+    #statusLabel {
+      flex: 1;
+      font-size: 11px
+    }
+
+    #configBtn {
+      padding: 8px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-s);
+      color: var(--text2);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: var(--font-body);
+      transition: border-color .15s, color .15s;
+      text-align: left;
+    }
+
+    #configBtn:hover {
+      border-color: var(--accent3);
+      color: var(--text)
+    }
+
+    /* ── MAIN ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden
+    }
+
+    .topbar {
+      height: 56px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+    }
+
+    .page-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 16px
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 10px
+    }
+
+    .count-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--accent2);
+    }
+
+    .count-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease-in-out infinite
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+        transform: scale(1)
+      }
+
+      50% {
+        opacity: .5;
+        transform: scale(.8)
+      }
+    }
+
+    /* ── PANELS ── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px
+    }
+
+    .content::-webkit-scrollbar {
+      width: 4px
+    }
+
+    .content::-webkit-scrollbar-track {
+      background: transparent
+    }
+
+    .content::-webkit-scrollbar-thumb {
+      background: var(--border2);
+      border-radius: 2px
+    }
+
+    .panel {
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+      animation: fadeIn .2s ease
+    }
+
+    .panel.active {
+      display: flex
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    /* ── CARDS ── */
+    .card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 16px;
+      color: var(--text)
+    }
+
+    /* ── FORM ── */
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px
+    }
+
+    label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text3)
+    }
+
+    input,
+    textarea,
+    select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 13px;
+      padding: 10px 14px;
+      width: 100%;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      border-color: var(--accent3);
+      box-shadow: 0 0 0 3px rgba(124, 108, 250, .12)
+    }
+
+    input::placeholder,
+    textarea::placeholder {
+      color: var(--text3)
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+      line-height: 1.6
+    }
+
+    /* ── MODE PILLS ── */
+    .mode-pills {
+      display: flex;
+      gap: 6px
+    }
+
+    .pill {
+      flex: 1;
+      padding: 8px;
+      text-align: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      color: var(--text2);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s;
+    }
+
+    .pill:hover {
+      border-color: var(--border2);
+      color: var(--text)
+    }
+
+    .pill.active {
+      background: rgba(124, 108, 250, .18);
+      border-color: var(--accent3);
+      color: var(--accent2)
+    }
+
+    /* ── FILE AREA ── */
+    .file-zone {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      transition: border-color .2s;
+    }
+
+    .file-zone:hover:not(.disabled) {
+      border-color: var(--accent3)
+    }
+
+    .file-zone.disabled {
+      opacity: .4;
+      cursor: not-allowed;
+      pointer-events: none
+    }
+
+    .file-zone-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: rgba(124, 108, 250, .12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 16px;
+    }
+
+    .file-zone-info .title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text)
+    }
+
+    .file-zone-info .sub {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 2px;
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap
+    }
+
+    /* ── DATE/TIME ROW ── */
+    .dt-row {
+      display: flex;
+      gap: 10px
+    }
+
+    .dt-row .field {
+      flex: 1
+    }
+
+    .dt-row .field.time {
+      max-width: 120px
+    }
+
+    /* ── TOGGLE ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      cursor: pointer;
+      user-select: none;
+      transition: border-color .2s;
+    }
+
+    .toggle-row:hover {
+      border-color: var(--border2)
+    }
+
+    .toggle-label {
+      font-size: 13px;
+      color: var(--text);
+      flex: 1
+    }
+
+    .toggle {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--border2);
+      border-radius: 10px;
+      transition: background .2s
+    }
+
+    .toggle.on .toggle-track {
+      background: var(--accent3)
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      top: 3px;
+      left: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .2s;
+      pointer-events: none
+    }
+
+    .toggle.on .toggle-thumb {
+      transform: translateX(16px)
+    }
+
+    /* ── BUTTONS ── */
+    .btn-row {
+      display: flex;
+      gap: 10px
+    }
+
+    .btn {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: opacity .15s, transform .15s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent3), var(--accent));
+      color: #fff
+    }
+
+    .btn-primary:hover {
+      opacity: .9;
+      transform: translateY(-1px)
+    }
+
+    .btn-ghost {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      color: var(--text2)
+    }
+
+    .btn-ghost:hover {
+      color: var(--text);
+      border-color: var(--accent3)
+    }
+
+    .btn-danger {
+      background: rgba(248, 113, 113, .1);
+      border: 1px solid rgba(248, 113, 113, .25);
+      color: var(--red)
+    }
+
+    .btn-danger:hover {
+      background: rgba(248, 113, 113, .2)
+    }
+
+    .btn:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+      transform: none !important
+    }
+
+    .spinner {
+      display: none;
+      width: 13px;
+      height: 13px;
+      border: 2px solid rgba(255, 255, 255, .3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite
+    }
+
+    .btn.loading .spinner {
+      display: block
+    }
+
+    .btn.loading .btn-label {
+      opacity: .5
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    /* ── GRID ── */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px
+    }
+
+    /* ── STAT CARDS ── */
+    .stat {
+      background: var(--surface);
+      border-radius: var(--radius-s);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text3)
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 24px;
+      color: var(--text)
+    }
+
+    .stat-value.green {
+      color: var(--green)
+    }
+
+    .stat-value.yellow {
+      color: var(--yellow)
+    }
+
+    .stat-value.red {
+      color: var(--red)
+    }
+
+    /* ── AGENDA CARDS ── */
+    .agenda-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px
+    }
+
+    .agenda-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: border-color .2s;
+    }
+
+    .agenda-card:hover {
+      border-color: var(--border2)
+    }
+
+    .agenda-card-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .agenda-card-icon.text {
+      background: rgba(124, 108, 250, .12)
+    }
+
+    .agenda-card-icon.file {
+      background: rgba(96, 165, 250, .12)
+    }
+
+    .agenda-card-icon.lote {
+      background: rgba(61, 214, 140, .12)
+    }
+
+    .agenda-card-body {
+      flex: 1;
+      min-width: 0
+    }
+
+    .agenda-card-target {
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap
+    }
+
+    .agenda-card-meta {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 2px
+    }
+
+    .agenda-card-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0
+    }
+
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: var(--text3);
+      transition: all .15s;
+    }
+
+    .icon-btn:hover {
+      border-color: var(--border2);
+      color: var(--text);
+      background: var(--surface)
+    }
+
+    .icon-btn.danger:hover {
+      border-color: rgba(248, 113, 113, .4);
+      color: var(--red);
+      background: rgba(248, 113, 113, .08)
+    }
+
+    /* ── BADGES ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .badge-pending {
+      background: rgba(155, 150, 184, .1);
+      color: var(--text2);
+      border: 1px solid rgba(155, 150, 184, .2)
+    }
+
+    .badge-running {
+      background: rgba(96, 165, 250, .1);
+      color: var(--blue);
+      border: 1px solid rgba(96, 165, 250, .2)
+    }
+
+    .badge-completed {
+      background: rgba(61, 214, 140, .1);
+      color: var(--green);
+      border: 1px solid rgba(61, 214, 140, .2)
+    }
+
+    .badge-failed {
+      background: rgba(248, 113, 113, .1);
+      color: var(--red);
+      border: 1px solid rgba(248, 113, 113, .2)
+    }
+
+    /* ── TOAST ── */
+    #toasts {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none
+    }
+
+    .toast {
+      padding: 10px 18px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      color: #fff;
+      animation: toastIn .25s ease;
+      white-space: nowrap;
+    }
+
+    .toast.success {
+      background: rgba(20, 90, 50, .97);
+      border: 1px solid rgba(61, 214, 140, .3)
+    }
+
+    .toast.error {
+      background: rgba(120, 25, 25, .97);
+      border: 1px solid rgba(248, 113, 113, .3)
+    }
+
+    .toast.info {
+      background: rgba(40, 30, 80, .97);
+      border: 1px solid rgba(124, 108, 250, .3)
+    }
+
+    .toast.fade-out {
+      animation: toastOut .3s ease forwards
+    }
+
+    @keyframes toastIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    @keyframes toastOut {
+      to {
+        opacity: 0;
+        transform: translateY(-8px)
+      }
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .6);
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px
+    }
+
+    .modal-overlay.open {
+      display: flex
+    }
+
+    .modal {
+      background: var(--bg2);
+      border: 1px solid var(--border2);
+      border-radius: 16px;
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+      animation: modalIn .2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 16px
+    }
+
+    @keyframes modalIn {
+      from {
+        opacity: 0;
+        transform: scale(.95)
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1)
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 16px
+    }
+
+    .modal-close {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border2);
+      background: var(--surface);
+      color: var(--text2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      transition: all .15s
+    }
+
+    .modal-close:hover {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red)
+    }
+
+    /* ── CONFIG MODAL ── */
+    .config-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px
+    }
+
+    .config-field label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text3)
+    }
+
+    /* ── LOTE ── */
+    .lote-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-s);
+      overflow: hidden;
+      margin-bottom: 8px
+    }
+
+    .lote-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border)
+    }
+
+    .lote-num {
+      width: 20px;
+      height: 20px;
+      background: var(--accent3);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 10px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0
+    }
+
+    .lote-target {
+      flex: 1;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text)
+    }
+
+    .lote-remove {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1px solid var(--border2);
+      background: transparent;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .15s
+    }
+
+    .lote-remove:hover {
+      background: var(--red);
+      border-color: var(--red);
+      color: #fff
+    }
+
+    .lote-body {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px
+    }
+
+    .lote-pills {
+      display: flex;
+      gap: 4px
+    }
+
+    .lote-pill {
+      flex: 1;
+      padding: 5px;
+      text-align: center;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      color: var(--text2);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all .15s
+    }
+
+    .lote-pill:hover {
+      border-color: var(--border2);
+      color: var(--text)
+    }
+
+    .lote-pill.active {
+      background: rgba(124, 108, 250, .18);
+      border-color: var(--accent3);
+      color: var(--accent2)
+    }
+
+    .lote-textarea {
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 12px;
+      padding: 8px 12px;
+      outline: none;
+      resize: vertical;
+      min-height: 60px;
+      transition: border-color .2s
+    }
+
+    .lote-textarea:focus {
+      border-color: var(--accent3)
+    }
+
+    .lote-file {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text2);
+      transition: border-color .2s
+    }
+
+    .lote-file:hover {
+      border-color: var(--accent3)
+    }
+
+    /* ── NO ITEMS ── */
+    .empty {
+      text-align: center;
+      padding: 48px 20px;
+      color: var(--text3);
+      font-size: 13px
+    }
+
+    .empty-icon {
+      font-size: 36px;
+      display: block;
+      margin-bottom: 12px;
+      opacity: .3
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: .05em
+    }
+
+    /* ── HINT ── */
+    .hint {
+      font-size: 12px;
+      color: var(--text3);
+      background: var(--surface);
+      border-radius: var(--radius-s);
+      padding: 10px 12px;
+      border-left: 3px solid var(--accent3);
+      line-height: 1.5
+    }
+
+    /* ── API URL indicator ── */
+    .api-missing {
+      background: rgba(251, 191, 36, .08);
+      border: 1px solid rgba(251, 191, 36, .2);
+      border-radius: var(--radius-s);
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--yellow);
+      display: flex;
+      align-items: center;
+      gap: 8px
+    }
+  </style>
 </head>
+
 <body>
-<div id="app">
+  <div id="app">
 
-  <header>
-    <div class="logo">
-      <div class="logo-icon"><img src="logo.png" alt="logo"/></div>
-      <div class="logo-name">Study <span>Practices</span></div>
-    </div>
-    <div class="header-right">
-      <button class="theme-btn" id="themeBtn" title="Alternar tema" onclick="toggleTheme()">🌙</button>
-      <div class="badge-count">
-        <span class="dot"></span>
-        <span id="execCount">0</span> envios
-      </div>
-    </div>
-  </header>
-
-  <div class="tabs">
-    <button class="tab active" data-tab="envio">Novo Envio</button>
-    <button class="tab"        data-tab="agenda">Meus Agendamentos</button>
-  </div>
-
-  <div class="panels">
-
-    <!-- PANEL: ENVIO -->
-    <div id="panel-envio" class="panel active">
-
-      <div class="sub-tabs">
-        <div class="sub-tab active" id="stab-simples" onclick="switchSubTab('simples')">Envio simples</div>
-        <div class="sub-tab"       id="stab-lote"    onclick="switchSubTab('lote')">Envio em lote</div>
+    <!-- SIDEBAR -->
+    <aside>
+      <div class="logo">
+        <div class="logo-mark">SP</div>
+        <div class="logo-text">Study Practices <span>WhatsApp Bot</span></div>
       </div>
 
-      <!-- ── SIMPLES ── -->
-      <div id="form-simples" style="display:flex;flex-direction:column;gap:14px;">
+      <nav>
+        <div class="nav-section">Envio</div>
+        <button class="nav-item active" onclick="goto('envio-simples',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+          Envio Simples
+        </button>
+        <button class="nav-item" onclick="goto('envio-lote',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+          </svg>
+          Envio em Lote
+        </button>
 
-        <div class="field">
-          <label>Contato / Número</label>
-          <input id="target" type="text" placeholder="Ex: 5511999999999 ou nome do grupo"/>
+        <div class="nav-section">Gerenciar</div>
+        <button class="nav-item" onclick="goto('agendamentos',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          Agendamentos
+          <span class="nav-badge" id="pendingBadge">0</span>
+        </button>
+        <button class="nav-item" onclick="goto('historico',this)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+          Histórico
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-pill">
+          <div class="status-dot" id="statusDot"></div>
+          <span id="statusLabel">Verificando...</span>
         </div>
+        <button id="configBtn" onclick="openConfig()">⚙ Configurações</button>
+      </div>
+    </aside>
 
-        <div class="field">
-          <label>Tipo de envio</label>
-          <div class="mode-pills">
-            <div class="mode-pill active" data-mode="text">Só texto</div>
-            <div class="mode-pill"        data-mode="file">Só arquivo</div>
-            <div class="mode-pill"        data-mode="file_text">Arquivo + texto</div>
+    <!-- MAIN -->
+    <main>
+      <div class="topbar">
+        <div class="page-title" id="pageTitle">Envio Simples</div>
+        <div class="topbar-right">
+          <div class="count-badge">
+            <div class="dot"></div><span id="execCount">0</span> enviados
           </div>
-        </div>
-
-        <div class="field" id="msg-field">
-          <label>Mensagem</label>
-          <textarea id="message" placeholder="Digite sua mensagem aqui..."></textarea>
-        </div>
-
-        <div class="file-area disabled" id="fileArea">
-          <div class="file-icon">📎</div>
-          <div class="file-info">
-            <div class="file-title">Selecionar arquivo(s)</div>
-            <div class="file-sub" id="fileLabel">Nenhum arquivo selecionado</div>
-          </div>
-        </div>
-
-        <div class="dt-row">
-          <div class="field" style="flex:1">
-            <label>Data</label>
-            <div class="date-wrap">
-              <input type="text" id="dateInput" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)" autocomplete="off"/>
-              <button class="cal-btn" onclick="openCal('dateInput')">📅</button>
-            </div>
-          </div>
-          <div class="field time-field">
-            <label>Hora</label>
-            <input type="text" id="timeInput" maxlength="5" placeholder="HH:MM"/>
-          </div>
-        </div>
-
-        <div class="toggle-row" id="dailyRow" onclick="toggleDaily()">
-          <span class="toggle-label">Enviar todos os dias (recorrente)</span>
-          <div class="toggle" id="dailyToggleUI">
-            <div class="toggle-track"></div>
-            <div class="toggle-thumb"></div>
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-ghost"   id="btnEnviar"  onclick="handleEnviarAgora()">
-            <span class="spinner"></span>
-            <span class="btn-label">Enviar agora</span>
-          </button>
-          <button class="btn btn-primary" id="btnAgendar" onclick="handleAgendar()">
-            <span class="spinner"></span>
-            <span class="btn-label">Agendar</span>
-          </button>
         </div>
       </div>
 
-      <!-- ── LOTE ── -->
-      <div id="form-lote" style="display:none;flex-direction:column;gap:14px;">
-        <div class="lote-hint">Digite os destinatários separados por vírgula, depois configure o conteúdo de cada um individualmente apertando no botão <strong>CONFIGURAR</strong> para agendar ou enviar na hora.</div>
-        <div class="field">
-          <label>Destinatários (separados por vírgula)</label>
-          <div style="display:flex;gap:8px;">
-            <input id="loteTargets" type="text" placeholder="Grupo A, Tips Basic, 5511999999999" style="flex:1" oninput="previewLoteCards()"/>
-            <button class="btn-parse" onclick="buildLoteCards()">Configurar ▸</button>
+      <div class="content">
+
+        <!-- ═══ ENVIO SIMPLES ═══ -->
+        <div id="panel-envio-simples" class="panel active">
+          <div id="apiWarning" class="api-missing" style="display:none">
+            ⚠ Configure a URL da API nas configurações para enviar mensagens.
           </div>
-        </div>
-        <div id="loteCards"></div>
-        <div class="btn-row" id="loteBtns" style="display:none;">
-          <button class="btn btn-ghost"   id="btnEnviarLote"  onclick="handleEnviarLote()">
-            <span class="spinner"></span><span class="btn-label">Enviar agora</span>
-          </button>
-          <button class="btn btn-primary" id="btnAgendarLote" onclick="handleAgendarLote()">
-            <span class="spinner"></span><span class="btn-label">Agendar lote</span>
-          </button>
-        </div>
-        <div id="loteDt" style="display:none;flex-direction:column;gap:14px;">
-          <div class="dt-row">
-            <div class="field" style="flex:1">
-              <label>Data</label>
-              <div class="date-wrap">
-                <input type="text" id="loteDateInput" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)" autocomplete="off"/>
-                <button class="cal-btn" onclick="openCal('loteDateInput')">📅</button>
+          <div class="grid-2">
+            <div class="card" style="grid-column:1/-1">
+              <div class="field">
+                <label>Contato / Número</label>
+                <input id="target" type="text" placeholder="Ex: 5511999999999 ou nome do grupo" />
               </div>
             </div>
-            <div class="field time-field">
-              <label>Hora início</label>
-              <input type="text" id="loteTimeInput" maxlength="5" placeholder="HH:MM"/>
+
+            <div class="card" style="grid-column:1/-1">
+              <div class="card-title">Tipo de envio</div>
+              <div class="mode-pills">
+                <div class="pill active" data-mode="text" onclick="setMode(this,'text')">✉ Só texto</div>
+                <div class="pill" data-mode="file" onclick="setMode(this,'file')">📎 Só arquivo</div>
+                <div class="pill" data-mode="file_text" onclick="setMode(this,'file_text')">📎✉ Arquivo + texto</div>
+              </div>
+            </div>
+
+            <div class="card" style="grid-column:1/-1" id="msgCard">
+              <div class="field">
+                <label>Mensagem</label>
+                <textarea id="message" placeholder="Digite sua mensagem aqui..."></textarea>
+              </div>
+            </div>
+
+            <div class="card" style="grid-column:1/-1" id="fileCard">
+              <div class="file-zone disabled" id="fileZone" onclick="selectFile()">
+                <div class="file-zone-icon">📎</div>
+                <div class="file-zone-info">
+                  <div class="title">Selecionar arquivo(s)</div>
+                  <div class="sub" id="fileLabel">Imagens, vídeos, PDFs, documentos...</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card" style="grid-column:1/-1">
+              <div class="card-title">Agendamento</div>
+              <div class="dt-row" style="margin-bottom:12px">
+                <div class="field">
+                  <label>Data</label>
+                  <input type="date" id="dateInput" />
+                </div>
+                <div class="field time">
+                  <label>Hora (Brasília)</label>
+                  <input type="time" id="timeInput" />
+                </div>
+              </div>
+              <div class="toggle-row" onclick="toggleDaily()">
+                <span class="toggle-label">Enviar todos os dias (recorrente)</span>
+                <div class="toggle" id="dailyToggle">
+                  <div class="toggle-track"></div>
+                  <div class="toggle-thumb"></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="grid-column:1/-1">
+              <div class="btn-row">
+                <button class="btn btn-ghost" id="btnEnviar" onclick="handleEnviar()">
+                  <span class="spinner"></span><span class="btn-label">⚡ Enviar agora</span>
+                </button>
+                <button class="btn btn-primary" id="btnAgendar" onclick="handleAgendar()">
+                  <span class="spinner"></span><span class="btn-label">📅 Agendar</span>
+                </button>
+              </div>
             </div>
           </div>
-          <div class="toggle-row" onclick="toggleLoteDaily()">
-            <span class="toggle-label">Enviar todos os dias (recorrente)</span>
-            <div class="toggle" id="loteDailyUI">
-              <div class="toggle-track"></div>
-              <div class="toggle-thumb"></div>
+        </div>
+
+        <!-- ═══ ENVIO EM LOTE ═══ -->
+        <div id="panel-envio-lote" class="panel">
+          <div class="card">
+            <div class="card-title">Destinatários</div>
+            <div class="hint" style="margin-bottom:12px">Digite os destinatários separados por vírgula, depois configure
+              o conteúdo de cada um individualmente.</div>
+            <div style="display:flex;gap:8px">
+              <input id="loteTargets" type="text" placeholder="Grupo A, Tips Basic, 5511999999999" style="flex:1"
+                oninput="previewLote()" />
+              <button class="btn btn-primary" style="flex:none;padding:10px 16px" onclick="buildLote()">Configurar
+                ▸</button>
             </div>
           </div>
-          <div class="btn-row">
-            <button class="btn btn-ghost" onclick="cancelLoteAgendar()">Cancelar</button>
-            <button class="btn btn-primary" id="btnConfirmarLote" onclick="confirmarAgendarLote()">
-              <span class="spinner"></span><span class="btn-label">Confirmar agendamento</span>
-            </button>
+
+          <div id="loteCards"></div>
+
+          <div id="loteBtns" style="display:none">
+            <div class="btn-row">
+              <button class="btn btn-ghost" id="btnEnviarLote" onclick="handleEnviarLote()">
+                <span class="spinner"></span><span class="btn-label">⚡ Enviar agora</span>
+              </button>
+              <button class="btn btn-primary" id="btnAgendarLote" onclick="showLoteDt()">
+                <span class="btn-label">📅 Agendar lote</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="loteDt" style="display:none" class="card">
+            <div class="card-title">Horário do lote</div>
+            <div class="dt-row" style="margin-bottom:12px">
+              <div class="field">
+                <label>Data</label>
+                <input type="date" id="loteDateInput" />
+              </div>
+              <div class="field time">
+                <label>Hora (Brasília)</label>
+                <input type="time" id="loteTimeInput" />
+              </div>
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-ghost"
+                onclick="document.getElementById('loteDt').style.display='none';document.getElementById('loteBtns').style.display='block'">Cancelar</button>
+              <button class="btn btn-primary" id="btnConfirmarLote" onclick="confirmarLote()">
+                <span class="spinner"></span><span class="btn-label">Confirmar agendamento</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-    </div><!-- /panel-envio -->
-
-    <!-- PANEL: AGENDA -->
-    <div id="panel-agenda" class="panel">
-      <div class="agenda-header">
-        <span class="agenda-title">Histórico</span>
-      </div>
-      <div id="cardList"></div>
-    </div>
-
-  </div>
-</div>
-
-<div id="toast-container"></div>
-
-<!-- CALENDÁRIO POPUP -->
-<div id="calPopup" class="cal-popup">
-  <div class="cal-nav">
-    <button onclick="calMove(-1)">‹</button>
-    <span id="calTitle"></span>
-    <button onclick="calMove(1)">›</button>
-  </div>
-  <div class="cal-weekdays">
-    <span>Dom</span><span>Seg</span><span>Ter</span>
-    <span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
-  </div>
-  <div id="calDays" class="cal-days"></div>
-</div>
-
-<!-- MODAL: FINS DE SEMANA -->
-<div class="modal-overlay" id="modalWk">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Enviar nos fins de semana?</div>
-      <button class="modal-close" onclick="resolveWk(null)">✕</button>
-    </div>
-    <div class="wk-picker">
-      <div class="wk-opt" onclick="resolveWk(true)"><span class="wk-ico">📅</span><span class="wk-label">Todos os dias</span></div>
-      <div class="wk-opt" onclick="resolveWk(false)"><span class="wk-ico">💼</span><span class="wk-label">Seg – Sex</span></div>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: EDITAR -->
-<div class="modal-overlay" id="modalEdit">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">Editar agendamento</div>
-      <button class="modal-close" onclick="closeEditModal()">✕</button>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="field"><label>Contato</label><input id="editTarget" type="text"/></div>
-      <div class="field">
-        <label>Tipo de envio</label>
-        <div class="custom-select" id="editModeSelect">
-          <div class="cs-selected" onclick="toggleCustomSelect('editModeSelect')">
-            <span class="cs-label">Só texto</span>
-            <span class="cs-arrow">▾</span>
+        <!-- ═══ AGENDAMENTOS ═══ -->
+        <div id="panel-agendamentos" class="panel">
+          <div class="grid-3">
+            <div class="stat">
+              <div class="stat-label">Pendentes</div>
+              <div class="stat-value yellow" id="sPending">—</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Concluídos</div>
+              <div class="stat-value green" id="sCompleted">—</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Falhas</div>
+              <div class="stat-value red" id="sFailed">—</div>
+            </div>
           </div>
-          <div class="cs-options">
-            <div class="cs-option active" data-value="text"     onclick="pickCustomSelect('editModeSelect','text','Só texto')">Só texto</div>
-            <div class="cs-option"        data-value="file"     onclick="pickCustomSelect('editModeSelect','file','Só arquivo')">Só arquivo</div>
-            <div class="cs-option"        data-value="file_text" onclick="pickCustomSelect('editModeSelect','file_text','Arquivo + texto')">Arquivo + texto</div>
+          <div class="section-header">
+            <div class="section-title">Agendamentos ativos</div>
+            <button class="btn-ghost btn" style="flex:none;padding:6px 14px;font-size:12px" onclick="loadTasks()">↺
+              Atualizar</button>
           </div>
+          <div id="taskList" class="agenda-list"></div>
         </div>
-        <input type="hidden" id="editMode" value="text"/>
-      </div>
-      <div class="field" id="editMsgField"><label>Mensagem</label><textarea id="editMessage"></textarea></div>
-      <div class="file-area" id="editFileArea" onclick="handleEditFile()">
-        <div class="file-icon">📎</div>
-        <div class="file-info">
-          <div class="file-title">Alterar arquivo(s)</div>
-          <div class="file-sub" id="editFileLabel">—</div>
-        </div>
-      </div>
-      <div class="dt-row">
-        <div class="field" style="flex:1">
-          <label>Data</label>
-          <div class="date-wrap">
-            <input type="text" id="editDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)" autocomplete="off"/>
-            <button class="cal-btn" onclick="openCal('editDate')">📅</button>
+
+        <!-- ═══ HISTÓRICO ═══ -->
+        <div id="panel-historico" class="panel">
+          <div class="section-header">
+            <div class="section-title">Histórico completo</div>
+            <button class="btn-ghost btn" style="flex:none;padding:6px 14px;font-size:12px" onclick="loadHistory()">↺
+              Atualizar</button>
           </div>
+          <div id="historyList" class="agenda-list"></div>
         </div>
-        <div class="field time-field">
-          <label>Hora</label>
-          <input type="text" id="editTime" maxlength="5" placeholder="HH:MM"/>
-        </div>
+
       </div>
-      <div class="toggle-row" id="editDailyRow" onclick="toggleEditDaily()">
-        <span class="toggle-label">Todos os dias</span>
-        <div class="toggle" id="editDailyToggleUI">
-          <div class="toggle-track"></div>
-          <div class="toggle-thumb"></div>
-        </div>
+    </main>
+  </div>
+
+  <div id="toasts"></div>
+
+  <!-- CONFIG MODAL -->
+  <div class="modal-overlay" id="modalConfig">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Configurações</div>
+        <button class="modal-close" onclick="closeModal('modalConfig')">✕</button>
       </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" style="flex:.4" onclick="closeEditModal()">Cancelar</button>
-      <button class="btn btn-primary" id="btnSalvarEdit" onclick="handleSalvarEdit()">
-        <span class="spinner"></span><span class="btn-label">Salvar</span>
-      </button>
+      <div class="config-field">
+        <label>URL da API (Railway)</label>
+        <input id="cfgApiUrl" type="text" placeholder="https://sua-app.up.railway.app" />
+      </div>
+      <div class="config-field">
+        <label>API Key</label>
+        <input id="cfgApiKey" type="password" placeholder="minha-chave-secreta" />
+      </div>
+      <div class="config-field">
+        <label>Número padrão (opcional)</label>
+        <input id="cfgPhone" type="text" placeholder="5511999999999" />
+      </div>
+      <button class="btn btn-primary" onclick="saveConfig()"><span class="btn-label">Salvar
+          configurações</span></button>
     </div>
   </div>
-</div>
 
-<!-- MODAL: ARQUIVO LOTE -->
-<div class="modal-overlay" id="modalLoteFile">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="modalLoteFileTitle">Arquivo para destinatário</div>
-      <button class="modal-close" onclick="closeLoteFileModal()">✕</button>
-    </div>
-    <div id="modalLoteFileContent" style="font-size:13px;color:var(--text2);margin-bottom:16px;"></div>
-    <div class="btn-row">
-      <button class="btn btn-ghost" onclick="clearLoteFile()">Remover arquivo</button>
-      <button class="btn btn-primary" onclick="pickLoteFile()"><span class="btn-label">Selecionar arquivo</span></button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: EDITAR LOTE -->
-<div class="modal-overlay" id="modalEditLote">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-header">
-      <div class="modal-title">Editar lote</div>
-      <button class="modal-close" onclick="closeEditLoteModal()">✕</button>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:12px;max-height:55vh;overflow-y:auto;padding-right:4px">
-      <div id="editLoteItens"></div>
-    </div>
-    <div style="margin-top:14px;display:flex;flex-direction:column;gap:10px">
-      <div class="dt-row">
-        <div class="field" style="flex:1">
-          <label>Data</label>
-          <div class="date-wrap">
-            <input type="text" id="editLoteDate" maxlength="10" placeholder="DD/MM/AAAA" oninput="maskDate(this)" autocomplete="off"/>
-            <button class="cal-btn" onclick="openCal('editLoteDate')">📅</button>
-          </div>
-        </div>
-        <div class="field time-field">
-          <label>Hora</label>
-          <input type="text" id="editLoteTime" maxlength="5" placeholder="HH:MM"/>
-        </div>
+  <!-- DELETE CONFIRM MODAL -->
+  <div class="modal-overlay" id="modalDelete">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Excluir agendamento</div>
+        <button class="modal-close" onclick="closeModal('modalDelete')">✕</button>
       </div>
-      <div class="toggle-row" onclick="toggleEditLoteDaily()">
-        <span class="toggle-label">Todos os dias</span>
-        <div class="toggle" id="editLoteDailyUI">
-          <div class="toggle-track"></div>
-          <div class="toggle-thumb"></div>
-        </div>
+      <p style="font-size:13px;color:var(--text2)" id="deleteMsg">Tem certeza?</p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="closeModal('modalDelete')">Cancelar</button>
+        <button class="btn btn-danger" id="btnConfirmDelete">Excluir</button>
       </div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" style="flex:.4" onclick="closeEditLoteModal()">Cancelar</button>
-      <button class="btn btn-primary" id="btnSalvarEditLote" onclick="handleSalvarEditLote()">
-        <span class="spinner"></span><span class="btn-label">Salvar lote</span>
-      </button>
-    </div>
   </div>
-</div>
 
-<script src="app.js"></script>
+  <script>
+    // ── CONFIG ────────────────────────────────────────────────────────────────
+    let cfg = {
+      apiUrl: localStorage.getItem('sp_apiUrl') || '',
+      apiKey: localStorage.getItem('sp_apiKey') || 'minha-chave-secreta',
+      phone: localStorage.getItem('sp_phone') || '',
+    };
+
+    function saveConfig() {
+      cfg.apiUrl = document.getElementById('cfgApiUrl').value.trim().replace(/\/$/, '');
+      cfg.apiKey = document.getElementById('cfgApiKey').value.trim();
+      cfg.phone = document.getElementById('cfgPhone').value.trim();
+      localStorage.setItem('sp_apiUrl', cfg.apiUrl);
+      localStorage.setItem('sp_apiKey', cfg.apiKey);
+      localStorage.setItem('sp_phone', cfg.phone);
+      closeModal('modalConfig');
+      toast('Configurações salvas!', 'success');
+      checkStatus();
+      updateApiWarning();
+    }
+
+    function openConfig() {
+      document.getElementById('cfgApiUrl').value = cfg.apiUrl;
+      document.getElementById('cfgApiKey').value = cfg.apiKey;
+      document.getElementById('cfgPhone').value = cfg.phone;
+      openModal('modalConfig');
+    }
+
+    function updateApiWarning() {
+      document.getElementById('apiWarning').style.display = cfg.apiUrl ? 'none' : 'flex';
+    }
+
+    // ── API CALLS ────────────────────────────────────────────────────────────
+    async function api(path, method = 'GET', body = null) {
+      if (!cfg.apiUrl) throw new Error('URL da API não configurada');
+      const opts = {
+        method,
+        headers: { 'x-api-key': cfg.apiKey, 'Content-Type': 'application/json' },
+      };
+      if (body) opts.body = JSON.stringify(body);
+      const r = await fetch(cfg.apiUrl + path, opts);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      return data;
+    }
+
+    // ── STATUS ────────────────────────────────────────────────────────────────
+    async function checkStatus() {
+      const dot = document.getElementById('statusDot');
+      const label = document.getElementById('statusLabel');
+      if (!cfg.apiUrl) {
+        dot.className = 'status-dot off';
+        label.textContent = 'Não configurado';
+        return;
+      }
+      try {
+        await api('/health');
+        dot.className = 'status-dot on';
+        label.textContent = 'API conectada';
+      } catch {
+        dot.className = 'status-dot off';
+        label.textContent = 'API offline';
+      }
+    }
+
+    // ── NAV ───────────────────────────────────────────────────────────────────
+    const pageTitles = {
+      'envio-simples': 'Envio Simples',
+      'envio-lote': 'Envio em Lote',
+      'agendamentos': 'Agendamentos',
+      'historico': 'Histórico',
+    };
+
+    function goto(panel, el) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById('panel-' + panel).classList.add('active');
+      if (el) el.classList.add('active');
+      document.getElementById('pageTitle').textContent = pageTitles[panel] || panel;
+      if (panel === 'agendamentos') loadTasks();
+      if (panel === 'historico') loadHistory();
+    }
+
+    // ── FORM STATE ───────────────────────────────────────────────────────────
+    let currentMode = 'text';
+    let filePath = null;
+    let isDailyOn = false;
+    let loteItems = [];
+
+    function setMode(el, mode) {
+      document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+      el.classList.add('active');
+      currentMode = mode;
+      document.getElementById('msgCard').style.display = mode === 'file' ? 'none' : '';
+      document.getElementById('fileCard').style.display = mode === 'text' ? 'none' : '';
+      const zone = document.getElementById('fileZone');
+      if (mode === 'text') { zone.classList.add('disabled'); filePath = null; updateFileLabel(''); }
+      else zone.classList.remove('disabled');
+    }
+
+    function toggleDaily() {
+      isDailyOn = !isDailyOn;
+      document.getElementById('dailyToggle').classList.toggle('on', isDailyOn);
+      document.getElementById('dateInput').disabled = isDailyOn;
+      document.getElementById('dateInput').style.opacity = isDailyOn ? '.4' : '1';
+    }
+
+    function selectFile() {
+      const input = document.createElement('input');
+      input.type = 'file'; input.multiple = true;
+      input.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip';
+      input.onchange = e => {
+        const files = Array.from(e.target.files);
+        filePath = files.map(f => f.name).join(', ');
+        updateFileLabel(filePath);
+        toast(`${files.length} arquivo(s) selecionado(s)`, 'info');
+      };
+      input.click();
+    }
+
+    function updateFileLabel(text) {
+      document.getElementById('fileLabel').textContent = text || 'Imagens, vídeos, PDFs, documentos...';
+    }
+
+    // ── DATE HELPERS ─────────────────────────────────────────────────────────
+    function todayStr() {
+      return new Date().toISOString().split('T')[0];
+    }
+    function nowPlusMins(m) {
+      const d = new Date(Date.now() + m * 60000);
+      return d.toTimeString().slice(0, 5);
+    }
+    function toISO(dateStr, timeStr) {
+      return `${dateStr}T${timeStr}:00`;
+    }
+
+    // ── VALIDAÇÃO ─────────────────────────────────────────────────────────────
+    function validate(target, mode, message, fp) {
+      if (!target) { toast('Informe o contato', 'error'); return false; }
+      if (mode === 'text' && !message) { toast('Escreva uma mensagem', 'error'); return false; }
+      if (mode === 'file' && !fp) { toast('Selecione um arquivo', 'error'); return false; }
+      if (mode === 'file_text' && (!fp || !message)) { toast('Arquivo e mensagem obrigatórios', 'error'); return false; }
+      return true;
+    }
+
+    // ── ENVIAR AGORA ──────────────────────────────────────────────────────────
+    async function handleEnviar() {
+      const target = document.getElementById('target').value.trim();
+      const message = document.getElementById('message').value.trim();
+      if (!validate(target, currentMode, message, filePath)) return;
+      const btn = document.getElementById('btnEnviar');
+      setLoading(btn, true);
+      try {
+        await api('/tasks', 'POST', {
+          target, mode: currentMode, message, file_path: filePath,
+          scheduled_time: toISO(todayStr(), nowPlusMins(0)),
+        });
+        toast('Mensagem enviada!', 'success');
+        resetForm();
+        updateCount();
+      } catch (e) {
+        toast('Erro: ' + e.message, 'error');
+      } finally { setLoading(btn, false); }
+    }
+
+    // ── AGENDAR ───────────────────────────────────────────────────────────────
+    async function handleAgendar() {
+      const target = document.getElementById('target').value.trim();
+      const message = document.getElementById('message').value.trim();
+      const date = document.getElementById('dateInput').value;
+      const time = document.getElementById('timeInput').value;
+      if (!validate(target, currentMode, message, filePath)) return;
+      if (!time) { toast('Informe o horário', 'error'); return; }
+      if (!isDailyOn && !date) { toast('Informe a data', 'error'); return; }
+      const scheduledTime = toISO(isDailyOn ? todayStr() : date, time);
+      const btn = document.getElementById('btnAgendar');
+      setLoading(btn, true);
+      try {
+        await api('/tasks', 'POST', {
+          target, mode: currentMode, message, file_path: filePath,
+          scheduled_time: scheduledTime, daily: isDailyOn, include_weekends: true,
+        });
+        toast('Agendado com sucesso!', 'success');
+        resetForm();
+      } catch (e) {
+        toast('Erro: ' + e.message, 'error');
+      } finally { setLoading(btn, false); }
+    }
+
+    function resetForm() {
+      document.getElementById('target').value = '';
+      document.getElementById('message').value = '';
+      filePath = null; updateFileLabel('');
+      document.querySelectorAll('.pill').forEach((p, i) => p.classList.toggle('active', i === 0));
+      currentMode = 'text';
+      document.getElementById('msgCard').style.display = '';
+      document.getElementById('fileCard').style.display = 'none';
+      document.getElementById('fileZone').classList.add('disabled');
+      isDailyOn = false;
+      document.getElementById('dailyToggle').classList.remove('on');
+      document.getElementById('dateInput').disabled = false;
+      document.getElementById('dateInput').style.opacity = '1';
+    }
+
+    // ── LOTE ─────────────────────────────────────────────────────────────────
+    function previewLote() {
+      const targets = document.getElementById('loteTargets').value.split(',').map(t => t.trim()).filter(Boolean);
+      loteItems = loteItems.filter(i => targets.includes(i.target));
+      targets.forEach(t => { if (!loteItems.find(i => i.target === t)) loteItems.push({ target: t, mode: 'text', message: '', file: null }); });
+    }
+
+    function buildLote() {
+      previewLote();
+      if (!loteItems.length) { toast('Adicione ao menos um destinatário', 'error'); return; }
+      renderLoteCards();
+      document.getElementById('loteBtns').style.display = 'block';
+    }
+
+    function renderLoteCards() {
+      const c = document.getElementById('loteCards');
+      c.innerHTML = loteItems.map((item, i) => `
+<div class="lote-card">
+  <div class="lote-card-header">
+    <div class="lote-num">${i + 1}</div>
+    <div class="lote-target">${esc(item.target)}</div>
+    <button class="lote-remove" onclick="removeLote(${i})">✕</button>
+  </div>
+  <div class="lote-body">
+    <div class="lote-pills">
+      <div class="lote-pill ${item.mode === 'text' ? 'active' : ''}" onclick="setLoteMode(${i},'text')">Texto</div>
+      <div class="lote-pill ${item.mode === 'file' ? 'active' : ''}" onclick="setLoteMode(${i},'file')">Arquivo</div>
+      <div class="lote-pill ${item.mode === 'file_text' ? 'active' : ''}" onclick="setLoteMode(${i},'file_text')">Arq+Texto</div>
+    </div>
+    ${item.mode !== 'file' ? `<textarea class="lote-textarea" placeholder="Mensagem para ${esc(item.target)}..." oninput="loteItems[${i}].message=this.value">${esc(item.message)}</textarea>` : ''}
+    ${item.mode !== 'text' ? `<div class="lote-file" onclick="pickLoteFile(${i})">📎 ${item.file || 'Selecionar arquivo'}</div>` : ''}
+  </div>
+</div>`).join('');
+    }
+
+    function removeLote(i) { loteItems.splice(i, 1); renderLoteCards(); if (!loteItems.length) { document.getElementById('loteBtns').style.display = 'none'; } }
+    function setLoteMode(i, mode) { loteItems[i].mode = mode; if (mode === 'file') loteItems[i].message = ''; renderLoteCards(); }
+    function pickLoteFile(i) {
+      const input = document.createElement('input'); input.type = 'file';
+      input.onchange = e => { if (e.target.files[0]) { loteItems[i].file = e.target.files[0].name; renderLoteCards(); } };
+      input.click();
+    }
+
+    function showLoteDt() {
+      document.getElementById('loteBtns').style.display = 'none';
+      document.getElementById('loteDt').style.display = 'block';
+      document.getElementById('loteDateInput').value = todayStr();
+    }
+
+    async function handleEnviarLote() {
+      if (!loteItems.length) return;
+      const btn = document.getElementById('btnEnviarLote');
+      setLoading(btn, true);
+      try {
+        for (const item of loteItems) {
+          await api('/tasks', 'POST', {
+            target: item.target, mode: item.mode, message: item.message,
+            scheduled_time: toISO(todayStr(), nowPlusMins(0)),
+          });
+        }
+        toast(`Lote enviado: ${loteItems.length} mensagem(s)!`, 'success');
+        loteItems = []; renderLoteCards();
+        document.getElementById('loteBtns').style.display = 'none';
+        updateCount();
+      } catch (e) { toast('Erro: ' + e.message, 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    async function confirmarLote() {
+      const date = document.getElementById('loteDateInput').value;
+      const time = document.getElementById('loteTimeInput').value;
+      if (!time || !date) { toast('Informe data e horário', 'error'); return; }
+      const btn = document.getElementById('btnConfirmarLote');
+      setLoading(btn, true);
+      try {
+        for (const item of loteItems) {
+          await api('/tasks', 'POST', {
+            target: item.target, mode: item.mode, message: item.message,
+            scheduled_time: toISO(date, time),
+          });
+        }
+        toast(`Lote agendado: ${loteItems.length} tarefa(s)!`, 'success');
+        loteItems = []; renderLoteCards();
+        document.getElementById('loteDt').style.display = 'none';
+      } catch (e) { toast('Erro: ' + e.message, 'error'); }
+      finally { setLoading(btn, false); }
+    }
+
+    // ── TASKS LIST ────────────────────────────────────────────────────────────
+    async function loadTasks() {
+      const list = document.getElementById('taskList');
+      list.innerHTML = '<div class="empty"><span class="empty-icon">⏳</span>Carregando...</div>';
+      try {
+        const data = await api('/tasks');
+        const tasks = (data.tasks || []).filter(t => t.status === 'pending' || t.status === 'running');
+        document.getElementById('pendingBadge').textContent = tasks.length;
+        if (!tasks.length) { list.innerHTML = '<div class="empty"><span class="empty-icon">📭</span>Nenhum agendamento pendente</div>'; return; }
+        list.innerHTML = tasks.map(t => taskCard(t)).join('');
+        updateStats(data.tasks || []);
+      } catch (e) { list.innerHTML = `<div class="empty"><span class="empty-icon">⚠</span>${e.message}</div>`; }
+    }
+
+    async function loadHistory() {
+      const list = document.getElementById('historyList');
+      list.innerHTML = '<div class="empty"><span class="empty-icon">⏳</span>Carregando...</div>';
+      try {
+        const data = await api('/tasks');
+        const tasks = data.tasks || [];
+        if (!tasks.length) { list.innerHTML = '<div class="empty"><span class="empty-icon">📭</span>Nenhum histórico ainda</div>'; return; }
+        list.innerHTML = tasks.map(t => taskCard(t)).join('');
+        updateStats(tasks);
+      } catch (e) { list.innerHTML = `<div class="empty"><span class="empty-icon">⚠</span>${e.message}</div>`; }
+    }
+
+    function updateStats(tasks) {
+      document.getElementById('sPending').textContent = tasks.filter(t => t.status === 'pending').length;
+      document.getElementById('sCompleted').textContent = tasks.filter(t => t.status === 'completed').length;
+      document.getElementById('sFailed').textContent = tasks.filter(t => t.status === 'failed').length;
+    }
+
+    function taskCard(t) {
+      const icons = { text: '✉', file: '📎', file_text: '📎' };
+      const dt = t.scheduled_time ? new Date(t.scheduled_time).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+      return `<div class="agenda-card" id="task-${t.id}">
+  <div class="agenda-card-icon ${t.mode || 'text'}">${icons[t.mode] || '✉'}</div>
+  <div class="agenda-card-body">
+    <div class="agenda-card-target">${esc(t.target || '')}</div>
+    <div class="agenda-card-meta">📅 ${dt} · ${modeLabel(t.mode)}</div>
+  </div>
+  <span class="badge badge-${t.status || 'pending'}">${statusLabel(t.status)}</span>
+  <div class="agenda-card-actions">
+    ${t.status === 'failed' ? `<button class="icon-btn" title="Reenviar" onclick="retryTask(${t.id})">↺</button>` : ''}
+    <button class="icon-btn danger" title="Excluir" onclick="confirmDelete(${t.id},'${esc(t.target || '')}')">🗑</button>
+  </div>
+</div>`;
+    }
+
+    async function retryTask(id) {
+      try {
+        const data = await api('/tasks');
+        const task = (data.tasks || []).find(t => t.id === id);
+        if (!task) { toast('Tarefa não encontrada', 'error'); return; }
+        await api('/tasks', 'POST', {
+          target: task.target, mode: task.mode, message: task.message || '',
+          scheduled_time: toISO(todayStr(), nowPlusMins(1)),
+        });
+        toast('Reenvio agendado!', 'info');
+        loadTasks();
+      } catch (e) { toast('Erro: ' + e.message, 'error'); }
+    }
+
+    let deleteId = null;
+    function confirmDelete(id, target) {
+      deleteId = id;
+      document.getElementById('deleteMsg').textContent = `Excluir agendamento de "${target}"?`;
+      document.getElementById('btnConfirmDelete').onclick = async () => {
+        try {
+          await api(`/tasks/${id}`, 'DELETE');
+          closeModal('modalDelete'); toast('Excluído', 'info');
+          loadTasks();
+        } catch (e) { toast('Erro: ' + e.message, 'error'); }
+      };
+      openModal('modalDelete');
+    }
+
+    // ── COUNT ─────────────────────────────────────────────────────────────────
+    async function updateCount() {
+      try {
+        const data = await api('/tasks');
+        const n = (data.tasks || []).filter(t => t.status === 'completed').length;
+        document.getElementById('execCount').textContent = n;
+      } catch { }
+    }
+
+    // ── HELPERS ───────────────────────────────────────────────────────────────
+    function statusLabel(s) { return { pending: 'Pendente', running: 'Enviando', completed: 'Enviado', failed: 'Falhou', cancelled: 'Cancelado' }[s] || s; }
+    function modeLabel(m) { return { text: 'Texto', file: 'Arquivo', file_text: 'Arq+Texto' }[m] || m; }
+    function esc(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+    function setLoading(btn, on) { btn.disabled = on; btn.classList.toggle('loading', on); }
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function toast(msg, type = 'info') {
+      const c = document.getElementById('toasts');
+      const el = document.createElement('div'); el.className = `toast ${type}`; el.textContent = msg; c.appendChild(el);
+      setTimeout(() => { el.classList.add('fade-out'); setTimeout(() => el.remove(), 320); }, 3500);
+    }
+
+    // ── INIT ──────────────────────────────────────────────────────────────────
+    function init() {
+      document.getElementById('dateInput').value = todayStr();
+      document.getElementById('timeInput').value = nowPlusMins(5);
+      document.getElementById('loteDateInput').value = todayStr();
+      document.getElementById('fileCard').style.display = 'none';
+      updateApiWarning();
+      checkStatus();
+      updateCount();
+      setInterval(checkStatus, 30000);
+      setInterval(updateCount, 15000);
+      if (!cfg.apiUrl) setTimeout(openConfig, 500);
+    }
+    init();
+  </script>
 </body>
+
 </html>
