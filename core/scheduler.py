@@ -44,6 +44,8 @@ def _run_executor(json_path: str):
     executor_path = BASE_DIR / "executor.py"
     cmd = [sys.executable, str(executor_path), json_path]
 
+    logger.info(f"[EXECUTOR] Disparando: {cmd}")
+
     flags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
     try:
         proc = subprocess.run(
@@ -54,14 +56,16 @@ def _run_executor(json_path: str):
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=600,   # 10 min máx por tarefa
+            timeout=600,
         )
+        logger.info(f"[EXECUTOR] stdout: {proc.stdout[-500:] if proc.stdout else 'vazio'}")
+        logger.info(f"[EXECUTOR] stderr: {proc.stderr[-500:] if proc.stderr else 'vazio'}")
         if proc.returncode != 0:
-            logger.error(f"Executor falhou (code {proc.returncode}): {proc.stderr[:500]}")
+            logger.error(f"[EXECUTOR] Falhou (code {proc.returncode})")
         else:
-            logger.info(f"Executor concluiu com sucesso: {json_path}")
+            logger.info(f"[EXECUTOR] Sucesso: {json_path}")
     except Exception as e:
-        logger.error(f"Erro ao lançar executor: {e}")
+        logger.error(f"[EXECUTOR] Exceção: {e}")
 
 
 # ── API pública ───────────────────────────────────────────────────────────
