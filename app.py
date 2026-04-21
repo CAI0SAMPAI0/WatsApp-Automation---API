@@ -1,4 +1,4 @@
-"""
+﻿"""
 app.py — Entrypoint no Railway.
 Flask + APScheduler. Expõe rotas HTTP para criar/listar/deletar agendamentos.
 """
@@ -8,7 +8,7 @@ import sys
 import signal
 import logging
 from datetime import datetime, timezone, timedelta
-
+from pathlib import Path
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,11 +19,16 @@ logger = logging.getLogger("app")
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from werkzeug.utils import secure_filename
 
 flask_app = Flask(__name__)
 CORS(flask_app)
 
 API_KEY = os.environ.get("APP_API_KEY", "minha-chave-secreta")
+
+# Configuração de Uploads
+UPLOAD_FOLDER = os.path.join("user_data", "uploads")
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def _auth(req):
     key = req.headers.get("x-api-key") or req.args.get("apikey")
@@ -56,14 +61,32 @@ def create_task():
 
     from core.db import get_db
     from core.scheduler import create_task as sched_create
+    from zoneinfo import ZoneInfo
 
-    data = request.json or {}
+    # --- SUPORTE A UPLOAD DE ARQUIVOS (MULTIPART) ---
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        data = request.form.to_dict()
+        file = request.files.get('file')
+        
+        if file and file.filename:
+            filename = secure_filename(file.filename)
+            # Adiciona timestamp para evitar duplicatas
+            save_name = f"{int(datetime.now().timestamp())}_{filename}"
+            file_path = os.path.join(UPLOAD_FOLDER, save_name)
+            
+            # O executor precisa do caminho absoluto para não se perder
+            abs_path = os.path.abspath(file_path)
+            file.save(abs_path)
+            data['file_path'] = abs_path
+            logger.info(f"[UPLOAD] Arquivo salvo em: {abs_path}")
+    else:
+        data = request.json or {}
+
+    # Validação de campos
     for f in ["target", "mode", "scheduled_time"]:
         if f not in data:
             return jsonify({"error": f"Campo obrigatório: {f}"}), 400
 
-    from zoneinfo import ZoneInfo
-    from datetime import datetime
     try:
         raw = data["scheduled_time"].replace("Z", "+00:00")
         dt = datetime.fromisoformat(raw)
@@ -71,12 +94,8 @@ def create_task():
             dt = dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
     except Exception:
         return jsonify({"error": "scheduled_time inválido. Use ISO: 2026-04-21T15:30:00"}), 400
-    
-    
 
     BRASILIA = ZoneInfo("America/Sao_Paulo")
-
-    # na rota POST /tasks, após o parse:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=BRASILIA)
 
@@ -110,15 +129,15 @@ def create_task():
             "file_path": data.get("file_path"),
         },
         scheduled_time=dt,
-        daily=data.get("daily", False),
-        include_weekends=data.get("include_weekends", True),
+        daily=data.get("daily", (data.get("daily") == "true")),
+        include_weekends=(data.get("include_weekends", "true") == "true"),
     )
 
     if not ok:
         db.deletar(task_id)
         return jsonify({"error": msg}), 500
 
-    return jsonify({"ok": True, "task_id": task_id, "scheduled_time": dt.isoformat()}), 201
+    return jsonify({"ok": True, "task_id": task_id, "scheduled_time": dt.isoformat()}), 201  
 
 
 @flask_app.route("/tasks/<int:task_id>", methods=["DELETE"])
