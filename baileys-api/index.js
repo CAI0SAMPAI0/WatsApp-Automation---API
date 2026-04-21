@@ -49,7 +49,7 @@ async function connectToWhatsApp() {
   sock = makeWASocket({
     version,
     auth: state,
-    logger: P({ level: 'silent' }),
+    logger: P({ level: 'info' }),
     printQRInTerminal: true,
     // Browsers.macOS é o fingerprint mais aceito pelo WhatsApp
     browser: Browsers.macOS('Desktop'),
