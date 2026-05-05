@@ -4,7 +4,8 @@ from flask import Flask, request, jsonify, make_response, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +16,31 @@ CORS(app)
 # Inicializa Supabase
 supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
 APP_API_KEY = os.getenv("APP_API_KEY", "minha-chave-secreta")
+
+BRAZIL_TZ = ZoneInfo("America/Sao_Paulo")
+
+
+def _parse_or_now_brasilia(raw_dt: str | None) -> datetime:
+    """Converte string ISO para datetime em America/Sao_Paulo."""
+    if not raw_dt:
+        return datetime.now(BRAZIL_TZ)
+
+    dt = datetime.fromisoformat(raw_dt.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=BRAZIL_TZ)
+    return dt.astimezone(BRAZIL_TZ)
+
+
+def _normalize_scheduled_time(raw_dt: str | None) -> str:
+    """Garante janela mínima de +5s para evitar agendamento no passado."""
+    now_sp = datetime.now(BRAZIL_TZ)
+    min_dt = now_sp + timedelta(seconds=5)
+    scheduled_at = _parse_or_now_brasilia(raw_dt)
+
+    if scheduled_at < min_dt:
+        scheduled_at = min_dt
+
+    return scheduled_at.isoformat()
 
 # ── ROTAS DE SISTEMA ────────────────────────────────────────────────────────
 
@@ -70,6 +96,9 @@ def tasks():
         
         if request.method == "POST":
             data = request.json
+            if not data or "target" not in data or "mode" not in data:
+                return jsonify({"error": "Campos 'target' e 'mode' são obrigatórios"}), 400
+
             # Remove a restrição de FK no insert
             res = supabase.table("tasks").insert({
                 "user_id": user_id,
@@ -77,7 +106,7 @@ def tasks():
                 "target": data["target"],
                 "mode": data["mode"],
                 "message": data.get("message", ""),
-                "scheduled_time": data["scheduled_time"],
+                "scheduled_time": _normalize_scheduled_time(data.get("scheduled_time")),
                 "status": "pending"
             }).execute()
             return jsonify({"ok": True}), 201
