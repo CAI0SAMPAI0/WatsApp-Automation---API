@@ -29,139 +29,104 @@ app.use((req, res, next) => {
   next()
 })
 
-// ── estado global ─────────────────────────────────────────────────────────
-let sock = null
-let qrCodeData = null
-let isConnected = false
-let isConnecting = false
-let reconnectAttempts = 0
-const MAX_RECONNECT_DELAY = 30000
+// ── estado global multi-sessão ──────────────────────────────────────────────
+const sessions = new Map()
 
-const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, 'auth_info')
+// Helper para pegar o diretório de auth de cada usuário
+const getAuthDir = (sessionId) => {
+  const dir = path.join(__dirname, 'sessions', sessionId)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  return dir
+}
 
-// ── conectar ao WhatsApp ──────────────────────────────────────────────────
-async function connectToWhatsApp() {
-  if (isConnecting) return
-  isConnecting = true
+async function connectToWhatsApp(sessionId) {
+  if (sessions.has(sessionId)) return sessions.get(sessionId)
 
-  const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
+  const authDir = getAuthDir(sessionId)
+  const { state, saveCreds } = await useMultiFileAuthState(authDir)
   const { version } = await fetchLatestBaileysVersion()
 
-  console.log(`[Baileys] Usando versão WA: ${version.join('.')}`)
+  console.log(`[Baileys] Iniciando sessão: ${sessionId}`)
 
-  sock = makeWASocket({
+  const sock = makeWASocket({
     version,
     auth: state,
     logger: P({ level: 'info' }),
-    printQRInTerminal: true,
-    // Browsers.macOS é o fingerprint mais aceito pelo WhatsApp
     browser: Browsers.macOS('Desktop'),
     syncFullHistory: false,
-    connectTimeoutMs: 60_000,
-    keepAliveIntervalMs: 25_000,
-    retryRequestDelayMs: 2_000,
-    defaultQueryTimeoutMs: 60_000,
   })
+
+  const sessionData = { sock, isConnected: false, qr: null }
+  sessions.set(sessionId, sessionData)
 
   sock.ev.on('creds.update', saveCreds)
-
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update
-
-    if (qr) {
-      console.log('[Baileys] QR Code gerado — acesse /qrcode para escanear')
-      qrCodeData = await qrcode.toDataURL(qr)
-      isConnected = false
-    }
-
+    if (qr) sessionData.qr = await qrcode.toDataURL(qr)
     if (connection === 'open') {
-      console.log('[Baileys] ✅ Conectado ao WhatsApp!')
-      isConnected = true
-      isConnecting = false
-      reconnectAttempts = 0
-      qrCodeData = null
+      sessionData.isConnected = true
+      sessionData.qr = null
+      console.log(`[Baileys] ✅ Sessão ${sessionId} conectada!`)
     }
-
     if (connection === 'close') {
-      isConnected = false
-      isConnecting = false
-
-      const statusCode = new Boom(lastDisconnect?.error)?.output?.statusCode
-      console.log(`[Baileys] Conexão fechada. Razão: ${statusCode}`)
-
-      if (statusCode === DisconnectReason.loggedOut) {
-        console.log('[Baileys] Logout detectado — removendo sessão...')
-        fs.rmSync(AUTH_DIR, { recursive: true, force: true })
-        reconnectAttempts = 0
-        setTimeout(connectToWhatsApp, 3_000)
-        return
+      sessionData.isConnected = false
+      const shouldReconnect = (new Boom(lastDisconnect?.error)?.output?.statusCode) !== DisconnectReason.loggedOut
+      if (shouldReconnect) connectToWhatsApp(sessionId)
+      else {
+        sessions.delete(sessionId)
+        fs.rmSync(authDir, { recursive: true, force: true })
       }
-
-      // back-off exponencial: 3s, 6s, 12s … até 30s
-      reconnectAttempts++
-      const delay = Math.min(3_000 * Math.pow(2, reconnectAttempts - 1), MAX_RECONNECT_DELAY)
-      console.log(`[Baileys] Reconectando em ${delay / 1000}s (tentativa ${reconnectAttempts})...`)
-      setTimeout(connectToWhatsApp, delay)
     }
   })
+
+  return sessionData
 }
 
-connectToWhatsApp()
+// ── middleware de sessão ──────────────────────────────────────────────────
+app.use(async (req, res, next) => {
+  if (req.path === '/health' || req.path === '/qrcode' || req.path.includes('/status')) return next()
+  const sessionId = req.headers['x-session-id']
+  if (!sessionId) {
+    return res.status(400).json({ error: 'x-session-id header é obrigatório' })
+  }
+  req.sessionId = sessionId
+  next()
+})
 
-// ══════════════════════════════════════════════════════════════════════════
-// ROTAS
-// ══════════════════════════════════════════════════════════════════════════
-
-app.get('/status', (req, res) => {
+app.get('/status', async (req, res) => {
+  const session = sessions.get(req.sessionId)
   res.json({
-    connected: isConnected,
-    hasQR: !!qrCodeData,
-    phone: sock?.user?.id || null,
+    connected: session?.isConnected || false,
+    hasQR: !!session?.qr,
+    sessionId: req.sessionId
   })
 })
 
-app.get('/qrcode', (req, res) => {
-  if (isConnected) {
-    return res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
-      <h2 style="color:green">✅ WhatsApp Conectado!</h2>
-      <p>Número: ${sock?.user?.id || 'desconhecido'}</p>
-    </body></html>`)
+app.get('/qrcode', async (req, res) => {
+  const sessionId = req.query.sessionId || req.sessionId
+  if (!sessionId) return res.status(400).send('Session ID necessário')
+  
+  const session = await connectToWhatsApp(sessionId)
+  
+  if (session.isConnected) {
+    return res.send(`<h2>✅ Conectado! (Sessão: ${sessionId})</h2>`)
   }
-  if (!qrCodeData) {
-    return res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px">
-      <h2>⏳ Gerando QR Code...</h2>
-      <p>Aguarde e recarregue a página em 5 segundos.</p>
-      <script>setTimeout(()=>location.reload(),5000)</script>
-    </body></html>`)
+  if (!session.qr) {
+    return res.send(`<h2>⏳ Gerando QR...</h2><script>setTimeout(()=>location.reload(),3000)</script>`)
   }
-  res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#111;color:#fff">
-    <h2>📱 Escaneie o QR Code</h2>
-    <p>Abra o WhatsApp → Dispositivos conectados → Conectar dispositivo</p>
-    <img src="${qrCodeData}" style="border-radius:12px;margin:20px auto;display:block"/>
-    <p style="color:#aaa;font-size:12px">A página atualiza automaticamente após conexão</p>
-    <script>
-      setInterval(async()=>{
-        const r = await fetch('/status')
-        const d = await r.json()
-        if(d.connected) location.reload()
-      }, 3000)
-    </script>
+  res.send(`<html><body style="background:#111;color:#fff;text-align:center;padding:50px">
+    <h3>Escaneie para Sessão: ${sessionId}</h3>
+    <img src="${session.qr}" />
+    <script>setInterval(async()=>{ const r=await fetch('/status',{headers:{'x-session-id':'${sessionId}'}}); const d=await r.json(); if(d.connected) location.reload(); }, 3000)</script>
   </body></html>`)
 })
 
 app.post('/send/text', async (req, res) => {
-  if (!isConnected) return res.status(503).json({ error: 'WhatsApp não conectado' })
+  const session = sessions.get(req.sessionId)
+  if (!session?.isConnected) return res.status(503).json({ error: 'Sessão não conectada' })
   const { number, message } = req.body
-  if (!number || !message) return res.status(400).json({ error: 'number e message são obrigatórios' })
-  try {
-    const jid = formatJID(number)
-    await sock.sendMessage(jid, { text: message })
-    console.log(`[OK] Texto enviado para ${number}`)
-    res.json({ ok: true, jid })
-  } catch (e) {
-    console.error(`[ERRO] ${e.message}`)
-    res.status(500).json({ error: e.message })
-  }
+  await session.sock.sendMessage(formatJID(number), { text: message })
+  res.json({ ok: true })
 })
 
 app.post('/send/media', async (req, res) => {

@@ -1,182 +1,95 @@
-﻿"""
-app.py — Entrypoint no Railway.
-Flask + APScheduler. Expõe rotas HTTP para criar/listar/deletar agendamentos.
-"""
-
 import os
-import sys
-import signal
 import logging
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="[%(asctime)s] [%(levelname)s] %(name)s — %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger("app")
-
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response, send_from_directory
 from flask_cors import CORS
-from werkzeug.utils import secure_filename
+from supabase import create_client, Client
+from dotenv import load_dotenv
+from datetime import datetime
 
-flask_app = Flask(__name__)
-CORS(flask_app)
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
 
-API_KEY = os.environ.get("APP_API_KEY", "minha-chave-secreta")
+app = Flask(__name__, static_folder='ui/web')
+CORS(app)
 
-# Configuração de Uploads
-UPLOAD_FOLDER = os.path.join("user_data", "uploads")
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# Inicializa Supabase
+supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+APP_API_KEY = os.getenv("APP_API_KEY", "minha-chave-secreta")
 
-def _auth(req):
-    key = req.headers.get("x-api-key") or req.args.get("apikey")
-    return key == API_KEY
+# ── ROTAS DE SISTEMA ────────────────────────────────────────────────────────
 
+@app.route("/health")
+def health(): return jsonify({"status": "online"})
 
-@flask_app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"ok": True, "time": datetime.now().isoformat()})
+@app.route("/api/config")
+def get_config():
+    return jsonify({
+        "apiUrl": request.host_url.rstrip('/'),
+        "apiKey": APP_API_KEY,
+        "baileysUrl": os.getenv("BAILEYS_URL")
+    })
 
+# ── AUTH ROUTES (TABELA CUSTOMIZADA 'users') ────────────────────────────────
 
-@flask_app.route("/tasks", methods=["GET"])
-def list_tasks():
-    if not _auth(request):
-        return jsonify({"error": "Unauthorized"}), 401
-    from core.db import get_db
-    rows  = get_db().listar_todos()
-    tasks = [
-        {"id": r[0], "task_name": r[1], "target": r[2],
-         "mode": r[3], "scheduled_time": r[4], "status": r[5], "created_at": r[6]}
-        for r in rows
-    ]
-    return jsonify({"tasks": tasks})
+@app.route("/auth/signup", methods=["POST", "OPTIONS"])
+def auth_signup():
+    if request.method == "OPTIONS": return make_response("", 200)
+    try:
+        data = request.json
+        res = supabase.table("users").insert({"email": data["email"].lower(), "password": data["password"]}).execute()
+        return jsonify({"ok": True, "user_id": res.data[0]["id"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
+@app.route("/auth/login", methods=["POST", "OPTIONS"])
+def auth_login():
+    if request.method == "OPTIONS": return make_response("", 200)
+    try:
+        data = request.json
+        res = supabase.table("users").select("id").eq("email", data["email"].lower()).eq("password", data["password"]).execute()
+        if not res.data: return jsonify({"error": "Credenciais inválidas"}), 401
+        return jsonify({"ok": True, "user_id": res.data[0]["id"]})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@flask_app.route("/tasks", methods=["POST"])
-def create_task():
-    if not _auth(request):
-        return jsonify({"error": "Unauthorized"}), 401
+# ── TASK ROUTES ──────────────────────────────────────────────────────────────
 
-    from core.db import get_db
-    from core.scheduler import create_task as sched_create
-    from zoneinfo import ZoneInfo
-
-    # --- SUPORTE A UPLOAD DE ARQUIVOS (MULTIPART) ---
-    if request.content_type and 'multipart/form-data' in request.content_type:
-        data = request.form.to_dict()
-        file = request.files.get('file')
-        
-        if file and file.filename:
-            filename = secure_filename(file.filename)
-            # Adiciona timestamp para evitar duplicatas
-            save_name = f"{int(datetime.now().timestamp())}_{filename}"
-            file_path = os.path.join(UPLOAD_FOLDER, save_name)
-            
-            # O executor precisa do caminho absoluto para não se perder
-            abs_path = os.path.abspath(file_path)
-            file.save(abs_path)
-            data['file_path'] = abs_path
-            logger.info(f"[UPLOAD] Arquivo salvo em: {abs_path}")
-    else:
-        data = request.json or {}
-
-    # Validação de campos
-    for f in ["target", "mode", "scheduled_time"]:
-        if f not in data:
-            return jsonify({"error": f"Campo obrigatório: {f}"}), 400
+@app.route("/tasks", methods=["GET", "POST", "OPTIONS"])
+def tasks():
+    if request.method == "OPTIONS": return make_response("", 200)
+    
+    user_id = request.headers.get("x-user-id")
+    if request.headers.get("x-api-key") != APP_API_KEY: return jsonify({"error": "Chave inválida"}), 401
+    if not user_id: return jsonify({"error": "Login necessário"}), 401
 
     try:
-        raw = data["scheduled_time"].replace("Z", "+00:00")
-        dt = datetime.fromisoformat(raw)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
-    except Exception:
-        return jsonify({"error": "scheduled_time inválido. Use ISO: 2026-04-21T15:30:00"}), 400
+        if request.method == "GET":
+            # Filtra tarefas pelo ID do usuário
+            res = supabase.table("tasks").select("*").eq("user_id", user_id).execute()
+            return jsonify({"ok": True, "tasks": res.data})
+        
+        if request.method == "POST":
+            data = request.json
+            # Remove a restrição de FK no insert
+            res = supabase.table("tasks").insert({
+                "user_id": user_id,
+                "task_name": f"Task_{int(datetime.now().timestamp())}",
+                "target": data["target"],
+                "mode": data["mode"],
+                "message": data.get("message", ""),
+                "scheduled_time": data["scheduled_time"],
+                "status": "pending"
+            }).execute()
+            return jsonify({"ok": True}), 201
+    except Exception as e:
+        return jsonify({"error": f"Erro interno: {str(e)}"}), 500
 
-    BRASILIA = ZoneInfo("America/Sao_Paulo")
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=BRASILIA)
-
-    TOLERANCE = timedelta(minutes=2)
-    if dt < datetime.now(BRASILIA) - TOLERANCE and not data.get("daily"):
-        return jsonify({"error": "Data/hora no passado"}), 400
-
-    task_name = f"ZapTask_{int(datetime.now().timestamp())}"
-    db        = get_db()
-
-    task_id = db.adicionar(
-        task_name=task_name,
-        target=data["target"],
-        mode=data["mode"],
-        message=data.get("message", ""),
-        file_path=data.get("file_path"),
-        scheduled_time=dt,
-    )
-
-    if not task_id or task_id == -1:
-        return jsonify({"error": "Falha ao salvar no banco"}), 500
-
-    ok, msg = sched_create(
-        task_id=task_id,
-        task_name=task_name,
-        json_config={
-            "task_id":   task_id,
-            "target":    data["target"],
-            "mode":      data["mode"],
-            "message":   data.get("message", ""),
-            "file_path": data.get("file_path"),
-        },
-        scheduled_time=dt,
-        daily=data.get("daily", (data.get("daily") == "true")),
-        include_weekends=(data.get("include_weekends", "true") == "true"),
-    )
-
-    if not ok:
-        db.deletar(task_id)
-        return jsonify({"error": msg}), 500
-
-    return jsonify({"ok": True, "task_id": task_id, "scheduled_time": dt.isoformat()}), 201  
-
-
-@flask_app.route("/tasks/<int:task_id>", methods=["DELETE"])
-def delete_task(task_id):
-    if not _auth(request):
-        return jsonify({"error": "Unauthorized"}), 401
-    from core.db import get_db
-    from core.scheduler import delete_task as sched_delete
-    sched_delete(task_id)
-    get_db().deletar(task_id)
-    return jsonify({"ok": True})
-
-
-def main():
-    from core.db        import get_db
-    from core.scheduler import get_scheduler, shutdown
-
-    logger.info("=" * 60)
-    logger.info("Study Practices — iniciando no Railway")
-    logger.info("=" * 60)
-
-    get_db()
-    logger.info("Banco de dados OK.")
-
-    get_scheduler()
-    logger.info("Scheduler iniciado.")
-
-    def _shutdown(sig, frame):
-        logger.info("Sinal recebido, encerrando...")
-        shutdown()
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT,  _shutdown)
-
-    port = int(os.environ.get("PORT", 5000))
-    logger.info(f"Flask rodando na porta {port}")
-    flask_app.run(host="0.0.0.0", port=port)
-
+@app.route("/", defaults={'path': ''})
+@app.route("/<path:path>")
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == "__main__":
-    main()
+    app.run(port=5000, debug=True)
