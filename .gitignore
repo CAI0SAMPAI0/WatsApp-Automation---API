@@ -10,3 +10,4 @@ node_modules/
 auth_info/
 # Local Netlify folder
 .netlify
+auth

@@ -1,0 +1,31 @@
+{
+  "name": "automacao_nova",
+  "version": "1.0.0",
+  "description": "SaaS de automação WhatsApp com agendamento, múltiplos arquivos e gestão de contatos/grupos.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "npx ts-node src/index.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CAI0SAMPAI0/WatsApp-Automation---API.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/CAI0SAMPAI0/WatsApp-Automation---API/issues"
+  },
+  "homepage": "https://github.com/CAI0SAMPAI0/WatsApp-Automation---API#readme",
+  "dependencies": {
+    "baileys": "^7.0.0-rc.9",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
+  }
+}
