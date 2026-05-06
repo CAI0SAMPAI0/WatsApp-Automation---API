@@ -1,213 +1,74 @@
-# 🤖 Automação WhatsApp — Bot Multi-Funcional
+# Study Practices - Automação WhatsApp
 
-<div align="center">
+SaaS de automação WhatsApp com agendamento, múltiplos arquivos e gestão de contatos/grupos.
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python&logoColor=white)](https://www.python.org/)
-[![Playwright](https://img.shields.io/badge/Playwright-Browser%20Automation-45ba4b?logo=playwright&logoColor=white)](https://playwright.dev/)
-[![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
-[![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+## Estrutura do Projeto
 
-**Sistema desktop completo de automação para WhatsApp com interface gráfica HTML/CSS/JS, backend Python/Playwright e instalador próprio.**
+- `frontend/`: NextJS + Tailwind + Shadcn UI
+- `backend/`: FastAPI (Python) - API Principal e Auth
+- `whatsapp-service/`: Baileys (TypeScript) - Ponte com WhatsApp
+- `worker/`: Celery Worker para execução de tarefas
 
-</div>
+## Requisitos
 
----
+- Node.js >= 20
+- Python >= 3.10
+- Redis (para a fila do Celery)
+- PostgreSQL (via Supabase ou local)
+- Conta Supabase (para Storage e Database)
 
-## 🎯 Sobre o Projeto
+## Configuração
 
-Sistema desktop de automação para WhatsApp desenvolvido com:
-- **Playwright** (Python) para controle automatizado do browser
-- **HTML/CSS/JavaScript** para interface gráfica moderna
-- **Python** para backend e lógica de negócio
-- **SQLite** para persistência de dados
-- **Instalador próprio** para distribuição fácil
+1. Crie um arquivo `.env` na raiz (e configure nos serviços se necessário):
 
----
-
-## 🔧 Problema que Resolve
-
-### Desafios de Comunicação em Massa
-
-**Para Empresas e Profissionais:**
-- ❌ Envio manual demorado (horas copiando/colando)
-- ❌ Impossível personalizar em escala
-- ❌ Perda de leads por demora em responder
-- ❌ Trabalho repetitivo sem rastreamento
-
-### Solução Automatizada
-
-✅ **Envio em Massa** - 100+ mensagens em minutos  
-✅ **Personalização** - Variáveis dinâmicas `{nome}`, `{empresa}`  
-✅ **Auto-responder** - Bot responde fora do horário  
-✅ **Interface Gráfica** - App desktop profissional  
-✅ **Instalador Próprio** - Distribuição sem Python  
-✅ **Analytics** - Dashboard com gráficos Chart.js  
-
----
-
-## ⚡ Funcionalidades
-
-### 📤 Envio em Massa
-- Importação CSV/Excel
-- Mensagens personalizadas com variáveis
-- Anexos (imagens, PDFs, vídeos)
-- Delay anti-ban inteligente
-- Retry automático
-
-### 🤖 Respostas Automáticas
-- Regras por palavras-chave
-- Mensagens de ausência
-- Templates rápidos
-
-### 🖥️ Interface Gráfica (HTML/CSS/JS)
-- Dashboard interativo
-- Editor WYSIWYG
-- Drag & drop de arquivos
-- Tema dark/light
-- Gráficos Chart.js
-
-### 📊 Analytics
-- Estatísticas em tempo real
-- Taxa de entrega
-- Histórico SQLite
-- Export PDF/CSV
-
-### 📦 Instalador
-- Setup .exe para Windows
-- One-click install
-- Auto-update
-
----
-
-## 🛠️ Stack Tecnológica
-
-| Camada | Tecnologia |
-|--------|-----------|
-| **Automação** | Playwright (Python) |
-| **Backend** | Python 3.8+ |
-| **Frontend** | HTML5 + CSS3 + JS |
-| **Gráficos** | Chart.js |
-| **Database** | SQLite |
-| **Comunicação** | WebSockets |
-| **Instalador** | PyInstaller + Inno Setup |
-
----
-
-## 📁 Estrutura
-
-```
-Automacao_WA/
-├── app/
-│   ├── frontend/          # HTML/CSS/JS
-│   │   ├── index.html
-│   │   ├── css/
-│   │   └── js/
-│   ├── backend/           # Python
-│   │   ├── main.py
-│   │   ├── automation/
-│   │   │   └── playwright_bot.py
-│   │   └── database/
-│   │       └── db_manager.py
-│   └── data/
-│       └── whatsapp.db    # SQLite
-├── installer/
-│   ├── build_exe.py       # PyInstaller
-│   └── setup.iss          # Inno Setup
-└── requirements.txt
+```env
+DATABASE_URL=postgresql://...
+SUPABASE_URL=https://...
+SUPABASE_SERVICE_ROLE_KEY=...
+JWT_SECRET=seu_segredo_aqui
+REDIS_URL=redis://localhost:6379/0
+WHATSAPP_SERVICE_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
----
+## Como Rodar
 
-## 🚀 Instalação
-
-### Via Instalador (Usuário)
-
+### 1. WhatsApp Service
 ```bash
-# Baixe: WhatsAppAutomacao_Setup.exe
-# Execute e siga o wizard
+cd whatsapp-service
+npm install
+npm start
 ```
 
-### Via Python (Desenvolvedor)
-
+### 2. Backend
 ```bash
-git clone https://github.com/CAI0SAMPAI0/Automacao_WA.git
-cd Automacao_WA
+cd backend
 pip install -r requirements.txt
-playwright install chromium
-python app/backend/main.py
+uvicorn app.main:app --reload --port 8000
 ```
 
----
+### 3. Celery Worker
+```bash
+# Em um novo terminal, na raiz do projeto
+celery -A backend.app.celery_app worker --loglevel=info
+celery -A backend.app.celery_app beat --loglevel=info
+```
 
-## 📖 Uso
+### 4. Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-1. **Iniciar aplicação** → Interface abre em `http://localhost:5000`
-2. **Login WhatsApp** → Escanear QR Code
-3. **Importar contatos** → CSV/Excel
-4. **Criar mensagem** com variáveis `{nome}`, `{empresa}`
-5. **Configurar delay** (5-15s recomendado)
-6. **Enviar** e monitorar dashboard
+## Funcionalidades Implementadas
 
----
-
-## ⚠️ Avisos Importantes
-
-### Termos WhatsApp
-
-> ⚡ **ATENÇÃO**: WhatsApp **não permite** automação não oficial. Riscos:
-> - Banimento de conta
-> - Bloqueio de número
-> - Restrições de envio
-
-**Recomendações:**
-- Use contas secundárias
-- Delays ≥10s
-- Limite <100 msgs/dia
-- Obtenha consentimento (LGPD)
-
-### Alternativa Oficial
-
-Para uso comercial: **WhatsApp Business API** oficial
-- [business.whatsapp.com](https://business.whatsapp.com/)
-
----
-
-## 💼 Casos de Uso
-
-- **E-commerce**: Carrinho abandonado
-- **Consultórios**: Lembretes de consulta
-- **Vendas**: Follow-up de leads
-- **Marketing**: Campanhas segmentadas
-- **Professores**: Envio de atividades
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Suporte para grupos
-- [ ] Integração CRM (Pipedrive, HubSpot)
-- [ ] Dashboard web multi-usuário
-- [ ] Migração para WhatsApp Business API
-
----
-
-## 📄 Licença
-
-MIT © 2025 - Uso educacional e pessoal
-
----
-
-## 👨‍💻 Autor
-
-**Caio Sampaio** - [@CAI0SAMPAI0](https://github.com/CAI0SAMPAI0)
-
----
-
-<div align="center">
-
-**⚠️ Use com responsabilidade e ética!**
-
-Made in Brazil
-
-</div>
+- [x] Login/Cadastro com JWT
+- [x] Conexão WhatsApp via QR Code
+- [x] Listagem de Contatos e Grupos do WhatsApp
+- [x] Envio Imediato (delay de 5s)
+- [x] Agendamento de Mensagens
+- [x] Upload de Múltiplos Arquivos (Imagens, Vídeos, PDF, etc)
+- [x] Dashboard de Status dos Agendamentos
+- [x] Persistência de Sessão WhatsApp
+```
