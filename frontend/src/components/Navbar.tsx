@@ -4,6 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { ThemeToggle } from './ThemeToggle'
+import { supabase } from '@/lib/supabase'
 
 const links = [
   { href: '/enviar', label: 'Enviar' },
@@ -11,8 +12,12 @@ const links = [
   { href: '/historico', label: 'Histórico' },
 ]
 
+
 export const Navbar = () => {
   const path = usePathname()
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+  }
 
   return (
     <nav style={{
@@ -55,6 +60,14 @@ export const Navbar = () => {
               </Link>
             )
           })}
+          <button onClick={handleLogout} style={{
+            padding: '8px 14px', borderRadius: '8px', fontSize: '13px',
+            fontWeight: 500, textDecoration: 'none', transition: 'all 0.2s',
+            background: 'var(--danger-dim)', color: 'var(--danger)',
+            border: '1px solid var(--danger-light)',
+          }}>
+            Sair
+          </button>
           <div style={{ marginLeft: '8px' }}>
             <ThemeToggle />
           </div>
