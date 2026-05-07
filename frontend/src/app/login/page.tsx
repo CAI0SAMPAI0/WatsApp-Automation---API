@@ -7,20 +7,23 @@ import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const handleLogin = async () => {
-    if (!email || !password) return setError('Preencha email e senha')
+    if (!username || !password) return setError('Preencha nome de usuário e senha')
     setLoading(true)
     setError('')
+
+    // convertendo username em email ficticio para autenticação interna
+    const email = `${username.trim().toLowerCase()}@tatiwa.local`
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError('Email ou senha incorretos')
+      setError('Usuário ou senha incorretos')
       setLoading(false)
     } else {
       router.replace('/enviar')
@@ -55,13 +58,13 @@ export default function LoginPage() {
         {/* Form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label style={labelStyle}>Email</label>
+            <label style={labelStyle}>Nome de Usuário</label>
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              placeholder="seu@email.com"
+              placeholder="seu nome de usuário"
               style={{ ...inputStyle, width: '100%' }}
             />
           </div>
