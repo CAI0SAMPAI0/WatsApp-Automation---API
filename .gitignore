@@ -1,13 +1,4 @@
-.venv/
-.vscode/
-.env
-# Cache Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-node_modules/
-auth_info/
-# Local Netlify folder
-.netlify
 auth
+node_modules
+.env
+.env.local
