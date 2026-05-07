@@ -10,6 +10,7 @@ const links = [
   { href: '/enviar', label: 'Enviar' },
   { href: '/enviar/lote', label: 'Envio em Lote' },
   { href: '/historico', label: 'Histórico' },
+  { href: '/conectar', label: 'Conectar' },
 ]
 
 

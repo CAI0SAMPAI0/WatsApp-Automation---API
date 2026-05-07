@@ -4,6 +4,7 @@ import makeWASocket, {
     useMultiFileAuthState,
     WASocket
 } from 'baileys'
+import { setQR, setConnected } from '../api/server'
 import QRCode from 'qrcode'
 import { syncContacts, syncIndividualContacts } from './sync'
 
@@ -20,10 +21,12 @@ export const createConnection = async (): Promise<WASocket> => {
         const { connection, lastDisconnect, qr } = update
 
         if (qr) {
+            setQR(qr)
             console.log(await QRCode.toString(qr, { type: 'terminal' }))
         }
 
         if (connection === 'close') {
+            setConnected(false)
             const shouldReconnect =
                 (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut
 
@@ -33,6 +36,7 @@ export const createConnection = async (): Promise<WASocket> => {
                 await createConnection()
             }
         } else if (connection === 'open') {
+            setConnected(true)
             console.log('Conectado com sucesso!')
             await syncContacts(sock)  // <- sincroniza grupos ao conectar
         }
