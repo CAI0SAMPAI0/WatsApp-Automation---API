@@ -6,6 +6,7 @@ export interface Contact {
     name: string
     jid: string
     type: ContactType
+    user_id: string
     created_at: string
 }
 

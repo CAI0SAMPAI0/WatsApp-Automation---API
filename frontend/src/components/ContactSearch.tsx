@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Contact } from '@/types'
 
@@ -13,15 +13,68 @@ export const ContactSearch = ({ onSelect, selected }: Props) => {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Contact[]>([])
   const [loading, setLoading] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user) setUserId(data.user.id)
+    })
+  }, [])
 
   const search = async (value: string) => {
     setQuery(value)
-    if (value.length < 2) { setResults([]); return }
+    if (value.length < 2 || !userId) {
+      setResults([])
+      return
+    }
+
     setLoading(true)
-    const { data, error } = await supabase
-      .from('contacts').select('*').ilike('name', `%${value}%`).limit(10)
-    if (!error && data) setResults(data)
-    setLoading(false)
+
+    try {
+      // 1. Buscar Contatos Individuais
+      const { data: contactsData, error: contactsError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', userId)
+        .ilike('name', `%${value}%`)
+        .limit(10)
+
+      // 2. Buscar Grupos
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('user_id', userId)
+        .ilike('subject', `%${value}%`)
+        .limit(10)
+
+      // 3. Unir e formatar os dados
+      const formattedContacts = (contactsData || []).map(c => ({
+        ...c,
+        type: 'individual' as const,
+        name: c.name || c.notify || c.jid
+      }))
+
+      const formattedGroups = (groupsData || []).map(g => ({
+        jid: g.jid,
+        name: g.subject || g.name || 'Grupo sem nome',
+        user_id: g.user_id,
+        type: 'group' as const,
+        // Mapeia outros campos se necessário no seu tipo Contact
+        id: g.id
+      }))
+
+      const allResults = [...formattedContacts, ...formattedGroups]
+
+      if (!contactsError && !groupsError) {
+        setResults(allResults)
+      } else {
+        console.error('Erro na busca:', contactsError || groupsError)
+      }
+    } catch (err) {
+      console.error('Erro inesperado:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -29,7 +82,10 @@ export const ContactSearch = ({ onSelect, selected }: Props) => {
       <input
         type="text"
         value={selected ? selected.name : query}
-        onChange={(e) => { if (selected) onSelect(null); search(e.target.value) }}
+        onChange={(e) => {
+          if (selected) onSelect(null)
+          search(e.target.value)
+        }}
         placeholder="Buscar contato ou grupo..."
         style={inputStyle}
         className="w-full"
@@ -48,9 +104,11 @@ export const ContactSearch = ({ onSelect, selected }: Props) => {
         }}>
           {results.map((c) => (
             <li key={c.jid} onClick={() => { onSelect(c); setResults([]); setQuery('') }}
-              style={{ padding: '10px 16px', cursor: 'pointer', display: 'flex',
+              style={{
+                padding: '10px 16px', cursor: 'pointer', display: 'flex',
                 alignItems: 'center', gap: '10px', borderBottom: '1px solid var(--border)',
-                transition: 'background 0.15s' }}
+                transition: 'background 0.15s'
+              }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--purple-dim)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <span style={{
@@ -78,8 +136,10 @@ export const ContactSearch = ({ onSelect, selected }: Props) => {
           </span>
           <span style={{ fontSize: '14px', fontWeight: 500 }}>{selected.name}</span>
           <button onClick={() => { onSelect(null); setQuery('') }}
-            style={{ marginLeft: 'auto', fontSize: '12px', color: 'var(--danger)',
-              background: 'none', border: 'none', cursor: 'pointer' }}>
+            style={{
+              marginLeft: 'auto', fontSize: '12px', color: 'var(--danger)',
+              background: 'none', border: 'none', cursor: 'pointer'
+            }}>
             remover
           </button>
         </div>

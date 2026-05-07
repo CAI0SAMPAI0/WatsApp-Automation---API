@@ -8,6 +8,8 @@ import { setQR, setConnected } from '../api/server'
 import QRCode from 'qrcode'
 import { syncContacts, syncIndividualContacts } from './sync'
 
+const userID = "00000000-0000-0000-0000-000000000001"; // UUID válido temporário
+
 export const createConnection = async (): Promise<WASocket> => {
     const { version } = await fetchLatestWaWebVersion()
     const { state, saveCreds } = await useMultiFileAuthState('auth')
@@ -38,13 +40,13 @@ export const createConnection = async (): Promise<WASocket> => {
         } else if (connection === 'open') {
             setConnected(true)
             console.log('Conectado com sucesso!')
-            await syncContacts(sock)  // <- sincroniza grupos ao conectar
+            await syncContacts(sock, userID)  // <- sincroniza grupos ao conectar
         }
     })
 
     // Captura contatos individuais quando o WhatsApp os envia
     sock.ev.on('messaging-history.set', async ({ contacts }) => {
-        await syncIndividualContacts(contacts)
+        await syncIndividualContacts(contacts, userID)
     })
 
     sock.ev.on('creds.update', saveCreds)
