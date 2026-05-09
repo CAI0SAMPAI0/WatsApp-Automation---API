@@ -6,27 +6,57 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
-export default function LoginPage() {
+export default function CadastroPage() {
   const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const handleLogin = async () => {
-    if (!username || !password) return setError('Preencha usuário e senha')
+  const handleCadastro = async () => {
+    if (!username || !password) return setError('Preencha todos os campos')
+    if (username.length < 3) return setError('Username deve ter pelo menos 3 caracteres')
+    if (password.length < 6) return setError('Senha deve ter pelo menos 6 caracteres')
+    if (password !== confirm) return setError('As senhas não coincidem')
+
     setLoading(true)
     setError('')
 
     const email = `${username.trim().toLowerCase()}@taty.local`
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      setError('Usuário ou senha incorretos')
+    // Verifica se username já existe
+    const { data: existing } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('username', username.trim().toLowerCase())
+      .single()
+
+    if (existing) {
+      setError('Este username já está em uso')
       setLoading(false)
-    } else {
-      router.replace('/enviar')
+      return
     }
+
+    const { data, error: signUpError } = await supabase.auth.signUp({ email, password })
+
+    if (signUpError || !data.user) {
+      setError('Erro ao criar conta: ' + signUpError?.message)
+      setLoading(false)
+      return
+    }
+
+    const { error: profileError } = await supabase
+      .from('user_profiles')
+      .insert({ id: data.user.id, username: username.trim().toLowerCase() })
+
+    if (profileError) {
+      setError('Erro ao salvar perfil: ' + profileError.message)
+      setLoading(false)
+      return
+    }
+
+    router.replace('/conectar')
   }
 
   return (
@@ -43,9 +73,9 @@ export default function LoginPage() {
           <Image src="/tati_logo.png" alt="Taty's English" width={72} height={72}
             style={{ borderRadius: '50%', border: '3px solid var(--purple-light)', marginBottom: '12px' }} />
           <h1 style={{ fontFamily: 'Playfair Display, serif', fontSize: '24px', color: 'var(--purple-dark)', marginBottom: '4px' }}>
-            Taty's English
+            Criar conta
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Painel de mensagens</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Taty's English — Painel</p>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -53,8 +83,8 @@ export default function LoginPage() {
             <label style={labelStyle}>Username</label>
             <input type="text" value={username}
               onChange={e => setUsername(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              placeholder="seu username"
+              onKeyDown={e => e.key === 'Enter' && handleCadastro()}
+              placeholder="ex: tati"
               style={{ ...inputStyle, width: '100%' }} />
           </div>
 
@@ -62,7 +92,16 @@ export default function LoginPage() {
             <label style={labelStyle}>Senha</label>
             <input type="password" value={password}
               onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              onKeyDown={e => e.key === 'Enter' && handleCadastro()}
+              placeholder="••••••••"
+              style={{ ...inputStyle, width: '100%' }} />
+          </div>
+
+          <div>
+            <label style={labelStyle}>Confirmar senha</label>
+            <input type="password" value={confirm}
+              onChange={e => setConfirm(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCadastro()}
               placeholder="••••••••"
               style={{ ...inputStyle, width: '100%' }} />
           </div>
@@ -75,7 +114,7 @@ export default function LoginPage() {
             }}>⚠️ {error}</p>
           )}
 
-          <button onClick={handleLogin} disabled={loading} style={{
+          <button onClick={handleCadastro} disabled={loading} style={{
             marginTop: '8px',
             background: loading ? 'var(--purple-light)' : 'var(--purple)',
             color: '#fff', fontWeight: 700, fontSize: '15px',
@@ -84,20 +123,16 @@ export default function LoginPage() {
             boxShadow: loading ? 'none' : 'var(--shadow)',
             transition: 'all 0.2s', width: '100%',
           }}>
-            {loading ? 'Entrando...' : 'Entrar'}
+            {loading ? 'Criando conta...' : 'Criar conta'}
           </button>
 
           <p style={{ textAlign: 'center', fontSize: '13px', color: 'var(--text-muted)' }}>
-            Não tem conta?{' '}
-            <Link href="/cadastro" style={{ color: 'var(--purple)', fontWeight: 600 }}>
-              Criar conta
+            Já tem conta?{' '}
+            <Link href="/login" style={{ color: 'var(--purple)', fontWeight: 600 }}>
+              Entrar
             </Link>
           </p>
         </div>
-
-        <p style={{ textAlign: 'center', marginTop: '24px', fontSize: '12px', color: 'var(--text-muted)' }}>
-          Sessão válida por 90 dias
-        </p>
       </div>
     </div>
   )

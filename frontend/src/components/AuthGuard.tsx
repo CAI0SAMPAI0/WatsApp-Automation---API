@@ -9,7 +9,7 @@ export const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname()
   const [checking, setChecking] = useState(true)
 
-  const isPublic = pathname === '/login'
+  const isPublic = pathname === '/login' || pathname === '/cadastro'
 
   useEffect(() => {
     if (isPublic) { setChecking(false); return }

@@ -11,7 +11,7 @@ export default function EnviarPage() {
     const [sendType, setSendType] = useState<SendType>('text')
     const [message, setMessage] = useState('')
     const [files, setFiles] = useState<File[]>([])
-    const [scheduledAt, setScheduledAt] = useState<Date>(new Date(Date.now() + 5000))
+    const [scheduledAt, setScheduledAt] = useState<Date>(new Date())
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -30,11 +30,17 @@ export default function EnviarPage() {
 
     const uploadFile = async (file: File): Promise<MessageFile> => {
         const path = `uploads/${Date.now()}-${file.name}`
-        const { error } = await supabase.storage.from('message-files')
+        console.log('Iniciando upload:', path, file.type, file.size)
+
+        const { data, error } = await supabase.storage.from('message-files')
             .upload(path, file, { contentType: file.type })
+
+        console.log('Upload result:', data, error)
+
         if (error) throw new Error('Erro ao fazer upload: ' + error.message)
-        const { data } = supabase.storage.from('message-files').getPublicUrl(path)
-        return { url: data.publicUrl, type: getFileType(file), name: file.name }
+        const { data: urlData } = supabase.storage.from('message-files').getPublicUrl(path)
+        console.log('URL pública:', urlData.publicUrl)
+        return { url: urlData.publicUrl, type: getFileType(file), name: file.name }
     }
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

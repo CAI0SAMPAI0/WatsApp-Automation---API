@@ -6,16 +6,20 @@ export interface Contact {
     name: string
     jid: string
     type: ContactType
-    user_id: string
     created_at: string
+}
+
+export interface MessageFile {
+    url: string
+    type: string
+    name: string
 }
 
 export interface ScheduledMessage {
     id: string
     contact_jid: string
     message?: string
-    file_url?: string
-    file_type?: string
+    files?: MessageFile[]
     send_type: SendType
     scheduled_at: string
     sent: boolean

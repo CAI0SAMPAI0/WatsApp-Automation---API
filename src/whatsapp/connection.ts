@@ -7,6 +7,7 @@ import makeWASocket, {
 import { setQR, setConnected } from '../api/server'
 import QRCode from 'qrcode'
 import { syncContacts, syncIndividualContacts } from './sync'
+import { supabase } from '../supabase/client'
 
 const userID = "00000000-0000-0000-0000-000000000001"; // UUID válido temporário
 
@@ -46,7 +47,35 @@ export const createConnection = async (): Promise<WASocket> => {
 
     // Captura contatos individuais quando o WhatsApp os envia
     sock.ev.on('messaging-history.set', async ({ contacts }) => {
-        await syncIndividualContacts(contacts, userID)
+        console.log(`Evento contacts.set recebido com ${contacts.length} contatos.`);
+    })
+
+    sock.ev.on('groups.upsert', async (groups) => {
+        const groupsToSave = groups.map((g) => ({
+            jid: g.id,
+            subject: g.subject,
+            user_id: userID
+        }))
+
+        const { error } = await supabase
+            .from('groups')
+            .upsert(groupsToSave, { onConflict: 'jid, user_id' })
+
+        if (error) console.error('Erro ao salvar novos grupos:', error.message)
+        else console.log(`${groupsToSave.length} grupo(s) atualizados.`)
+    })
+
+    sock.ev.on('groups.update', async (updates) => {
+        for (const update of updates) {
+            if (!update.subject) continue
+            const { error } = await supabase
+                .from('groups')
+                .update({ subject: update.subject })
+                .eq('jid', update.id)
+
+            if (error) console.error('Erro ao atualizar grupo:', error.message)
+            else console.log(`Grupo ${update.id} atualizado: ${update.subject}`)
+        }
     })
 
     sock.ev.on('creds.update', saveCreds)

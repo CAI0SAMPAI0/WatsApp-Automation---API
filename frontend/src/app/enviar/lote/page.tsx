@@ -24,7 +24,8 @@ const newItem = (): BatchItem => ({
 
 export default function LotePage() {
     const [items, setItems] = useState<BatchItem[]>([newItem()])
-    const [scheduledAt, setScheduledAt] = useState<Date>(new Date(Date.now() + 5000))
+    const [scheduledAt, setScheduledAt] = useState<Date>(new Date())
+
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
