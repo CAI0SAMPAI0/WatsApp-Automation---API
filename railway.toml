@@ -5,3 +5,6 @@ buildCommand = "npm install && npx tsc"
 [deploy]
 startCommand = "node dist/index.js"
 restartPolicyType = "on_failure"
+
+[build.environment]
+NIXPACKS_NODE_VERSION = "20"
