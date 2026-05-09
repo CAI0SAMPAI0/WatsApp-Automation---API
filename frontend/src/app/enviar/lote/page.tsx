@@ -25,7 +25,6 @@ const newItem = (): BatchItem => ({
 export default function LotePage() {
     const [items, setItems] = useState<BatchItem[]>([newItem()])
     const [scheduledAt, setScheduledAt] = useState<Date>(new Date())
-
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -67,6 +66,10 @@ export default function LotePage() {
 
         setLoading(true)
         try {
+            // Pega o usuário logado
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Usuário não autenticado')
+
             const rows = await Promise.all(items.map(async (item) => {
                 let uploadedFiles: MessageFile[] = []
                 if (item.sendType !== 'text' && item.files.length > 0)
@@ -79,6 +82,7 @@ export default function LotePage() {
                     send_type: item.sendType,
                     scheduled_at: scheduledAt.toISOString(),
                     sent: false,
+                    user_id: user.id, // <-- salva quem agendou
                 }
             }))
 

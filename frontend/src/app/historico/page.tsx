@@ -29,11 +29,21 @@ export default function HistoricoPage() {
 
     const load = async () => {
         setLoading(true)
+
+        // Pega o usuário logado
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setLoading(false); return }
+
         let query = supabase
-            .from('scheduled_messages').select('*')
-            .order('scheduled_at', { ascending: false }).limit(50)
+            .from('scheduled_messages')
+            .select('*')
+            .eq('user_id', user.id) // <-- só mensagens do usuário logado
+            .order('scheduled_at', { ascending: false })
+            .limit(50)
+
         if (filter === 'sent') query = query.eq('sent', true)
         if (filter === 'pending') query = query.eq('sent', false)
+
         const { data } = await query
         setMessages(data ?? [])
         setLoading(false)
@@ -41,7 +51,6 @@ export default function HistoricoPage() {
 
     useEffect(() => { load() }, [filter])
 
-    // Atualiza status automaticamente a cada 10s
     useEffect(() => {
         const interval = setInterval(load, 10000)
         return () => clearInterval(interval)
@@ -98,7 +107,6 @@ export default function HistoricoPage() {
                                 borderRadius: '12px', padding: '16px 20px',
                                 boxShadow: 'var(--shadow)',
                                 borderLeft: `4px solid ${status.border}`,
-                                transition: 'transform 0.15s',
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

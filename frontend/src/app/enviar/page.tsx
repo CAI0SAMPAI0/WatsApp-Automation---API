@@ -30,16 +30,10 @@ export default function EnviarPage() {
 
     const uploadFile = async (file: File): Promise<MessageFile> => {
         const path = `uploads/${Date.now()}-${file.name}`
-        console.log('Iniciando upload:', path, file.type, file.size)
-
         const { data, error } = await supabase.storage.from('message-files')
             .upload(path, file, { contentType: file.type })
-
-        console.log('Upload result:', data, error)
-
         if (error) throw new Error('Erro ao fazer upload: ' + error.message)
         const { data: urlData } = supabase.storage.from('message-files').getPublicUrl(path)
-        console.log('URL pública:', urlData.publicUrl)
         return { url: urlData.publicUrl, type: getFileType(file), name: file.name }
     }
 
@@ -56,6 +50,10 @@ export default function EnviarPage() {
 
         setLoading(true)
         try {
+            // Pega o usuário logado
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) throw new Error('Usuário não autenticado')
+
             let uploadedFiles: MessageFile[] = []
             if (sendType !== 'text' && files.length > 0)
                 uploadedFiles = await Promise.all(files.map(uploadFile))
@@ -67,6 +65,7 @@ export default function EnviarPage() {
                 send_type: sendType,
                 scheduled_at: scheduledAt.toISOString(),
                 sent: false,
+                user_id: user.id, // <-- salva quem agendou
             })
             if (error) throw error
 
@@ -126,7 +125,6 @@ export default function EnviarPage() {
                             display: 'block', border: '2px dashed var(--purple-light)',
                             borderRadius: '10px', padding: '20px', textAlign: 'center',
                             cursor: 'pointer', background: 'var(--purple-dim)',
-                            transition: 'border-color 0.2s',
                         }}>
                             <input type="file" multiple onChange={handleFileChange} style={{ display: 'none' }} />
                             <p style={{ color: 'var(--purple)', fontWeight: 600, fontSize: '14px' }}>
@@ -146,10 +144,7 @@ export default function EnviarPage() {
                                     }}>
                                         <span style={{ color: 'var(--purple-dark)' }}>📄 {f.name}</span>
                                         <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
-                                            style={{
-                                                color: 'var(--danger)', background: 'none', border: 'none',
-                                                cursor: 'pointer', fontSize: '12px'
-                                            }}>
+                                            style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
                                             remover
                                         </button>
                                     </li>
