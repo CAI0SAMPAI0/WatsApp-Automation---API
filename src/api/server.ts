@@ -1,4 +1,5 @@
 import express from 'express'
+import cors from 'cors'
 
 let currentQR: string | null = null
 let isConnected = false
@@ -10,10 +11,9 @@ export const startServer = () => {
     const app = express()
     const PORT = process.env.PORT || 3001
 
-    app.use((req, res, next) => {
-        res.header('Access-Control-Allow-Origin', '*')
-        next()
-    })
+    app.use(cors({
+        origin: '*'
+    }))
 
     app.get('/status', (req, res) => {
         res.json({ connected: isConnected, hasQR: !!currentQR })
