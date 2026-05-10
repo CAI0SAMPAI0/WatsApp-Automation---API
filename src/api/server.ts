@@ -1,6 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-import * as SessionManager from '../whatsapp/sessionManager'
+import * as SessionManager from '../whatsapp/sessionManager.js'
 
 export const startServer = () => {
     const app = express()

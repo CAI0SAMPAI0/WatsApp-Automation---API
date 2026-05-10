@@ -1,11 +1,13 @@
 {
   "name": "automacao_nova",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "ts-node src/index.ts"
+    "dev": "ts-node src/index.ts",
+    "build": "tsc"
   },
   "repository": {
     "type": "git",
@@ -23,17 +25,18 @@
   "homepage": "https://github.com/CAI0SAMPAI0/WatsApp-Automation---API#readme",
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",
+    "@whiskeysockets/baileys": "^7.0.0-rc10",
     "baileys": "^7.0.0-rc.9",
+    "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "qrcode": "^1.5.4",
-    "typescript": "^5.8.3",
-    "cors": "^2.8.5",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/qrcode": "^1.5.6",
-    "@types/cors": "^2.8.17"
+    "@types/qrcode": "^1.5.6"
   }
 }

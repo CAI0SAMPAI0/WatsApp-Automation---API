@@ -1,7 +1,7 @@
-import { supabase } from '../supabase/client'
-import { sendMessage } from './sender'
-import { SendType } from '../types'
-import * as SessionManager from '../whatsapp/sessionManager'
+import { supabase } from '../supabase/client.js'
+import { sendMessage } from './sender.js'
+import { SendType } from '../types/index.js'
+import * as SessionManager from '../whatsapp/sessionManager.js'
 
 const processing = new Set<string>()
 

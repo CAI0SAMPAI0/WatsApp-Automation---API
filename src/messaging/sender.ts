@@ -1,5 +1,5 @@
-import { WASocket } from 'baileys'
-import { MessagePayload, SendType, MessageFile } from '../types'
+import { WASocket } from '@whiskeysockets/baileys'
+import { MessagePayload, SendType, MessageFile } from '../types/index.js'
 
 export const sendMessage = async (
     sock: WASocket,

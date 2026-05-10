@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { ContactSearch } from '@/components/ContactSearch'
 import { SchedulePicker } from '@/components/SchedulePicker'
@@ -31,6 +31,28 @@ export default function HistoricoPage() {
     const [loading, setLoading] = useState(true)
     const [editingMsg, setEditingMsg] = useState<Message | null>(null)
 
+    const load = useCallback(async () => {
+        setLoading(true)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setLoading(false); return }
+
+        let query = supabase
+            .from('scheduled_messages')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('scheduled_at', { ascending: false })
+            .limit(50)
+
+        if (filter === 'sent') query = query.eq('sent', true)
+        if (filter === 'pending') query = query.eq('sent', false)
+
+        const { data } = await query
+        setMessages(data ?? [])
+        setLoading(false)
+    }, [filter])
+
+    useEffect(() => { load() }, [load])
+
     const updateMessage = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!editingMsg) return
@@ -52,12 +74,16 @@ export default function HistoricoPage() {
         load()
     }
 
-    const formatDate = (iso: string) =>
-        new Date(iso).toLocaleString('pt-BR', {
-            timeZone: 'America/Sao_Paulo',
+    const formatDate = (iso: string) => {
+        const date = new Date(iso);
+        const offset = -3;
+        date.setHours(date.getHours() + offset);
+        
+        return date.toLocaleString('pt-BR', {
             day: '2-digit', month: '2-digit', year: 'numeric',
             hour: '2-digit', minute: '2-digit',
-        })
+        });
+    }
 
     return (
         <div style={{ maxWidth: '720px', margin: '0 auto', padding: '16px' }}>

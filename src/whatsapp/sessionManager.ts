@@ -1,5 +1,5 @@
-import { WASocket, useMultiFileAuthState, DisconnectReason } from '@baileys/connection'
-import makeWASocket from '@baileys/connection'
+import { WASocket, useMultiFileAuthState, DisconnectReason, ConnectionState } from '@whiskeysockets/baileys'
+import makeWASocket from '@whiskeysockets/baileys'
 import path from 'path'
 import fs from 'fs'
 
@@ -21,7 +21,7 @@ export const createUserSession = async (userId: string) => {
 
     socket.ev.on('creds.update', saveCreds)
 
-    socket.ev.on('connection.update', (update) => {
+    socket.ev.on('connection.update', (update: Partial<ConnectionState>) => {
         const { connection, lastDisconnect, qr } = update
         if (qr) qrCodes.set(userId, qr)
         if (connection === 'open') {
@@ -39,6 +39,7 @@ export const createUserSession = async (userId: string) => {
     sessions.set(userId, socket)
     return socket
 }
+// ... rest of file (getUserSession, getQR, isConnected, disconnectUserSession are unchanged)
 
 export const getUserSession = (userId: string) => sessions.get(userId)
 export const getQR = (userId: string) => qrCodes.get(userId)

@@ -1,5 +1,5 @@
 import { WASocket } from "baileys";
-import { supabase } from "../supabase/client";
+import { supabase } from "../supabase/client.js";
 
 export const syncContacts = async (sock: WASocket, userId: string): Promise<void> => {
     console.log('Sincronizando apenas GRUPOS...')
