@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { ContactSearch } from '@/components/ContactSearch'
 import { SchedulePicker } from '@/components/SchedulePicker'
 
 interface Message {
@@ -25,11 +24,22 @@ const getStatus = (msg: Message) => {
     return { label: '⏳ Agendado', color: 'var(--purple)', bg: 'var(--purple-dim)', border: 'var(--purple-light)' }
 }
 
+const formatDate = (iso: string) => {
+    return new Date(iso).toLocaleString('pt-BR', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+        timeZone: 'America/Sao_Paulo',
+    })
+}
+
 export default function HistoricoPage() {
     const [messages, setMessages] = useState<Message[]>([])
     const [filter, setFilter] = useState<'all' | 'sent' | 'pending'>('all')
     const [loading, setLoading] = useState(true)
     const [editingMsg, setEditingMsg] = useState<Message | null>(null)
+    const [editMessage, setEditMessage] = useState('')
+    const [editDate, setEditDate] = useState<Date>(new Date())
+    const [saving, setSaving] = useState(false)
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -53,36 +63,50 @@ export default function HistoricoPage() {
 
     useEffect(() => { load() }, [load])
 
+    const openEdit = (msg: Message) => {
+        setEditingMsg(msg)
+        setEditMessage(msg.message || '')
+        setEditDate(new Date(msg.scheduled_at))
+    }
+
+    const closeEdit = () => {
+        setEditingMsg(null)
+        setEditMessage('')
+        setEditDate(new Date())
+    }
+
     const updateMessage = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!editingMsg) return
-        await supabase.from('scheduled_messages').update({
-            message: editingMsg.message,
-            scheduled_at: editingMsg.scheduled_at,
-        }).eq('id', editingMsg.id)
-        setEditingMsg(null)
-        load()
+        setSaving(true)
+        try {
+            const { error } = await supabase.from('scheduled_messages').update({
+                message: editMessage,
+                scheduled_at: editDate.toISOString(),
+            }).eq('id', editingMsg.id)
+
+            if (error) throw error
+            closeEdit()
+            await load()
+        } catch (err: any) {
+            alert('Erro ao salvar: ' + err.message)
+        } finally {
+            setSaving(false)
+        }
     }
 
     const deleteMessage = async (id: string, batch_id?: string) => {
         if (!confirm('Deseja remover esta mensagem?')) return
-        if (batch_id) {
-            await supabase.from('scheduled_messages').delete().eq('batch_id', batch_id)
-        } else {
-            await supabase.from('scheduled_messages').delete().eq('id', id)
+        try {
+            if (batch_id) {
+                await supabase.from('scheduled_messages').delete().eq('batch_id', batch_id)
+            } else {
+                await supabase.from('scheduled_messages').delete().eq('id', id)
+            }
+            await load()
+        } catch (err: any) {
+            alert('Erro ao remover: ' + err.message)
         }
-        load()
-    }
-
-    const formatDate = (iso: string) => {
-        const date = new Date(iso);
-        const offset = -3;
-        date.setHours(date.getHours() + offset);
-        
-        return date.toLocaleString('pt-BR', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit',
-        });
     }
 
     return (
@@ -90,11 +114,12 @@ export default function HistoricoPage() {
             <div style={{ marginBottom: '28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h1 style={{ fontSize: '30px', color: 'var(--purple-dark)', marginBottom: '4px' }}>Histórico</h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{messages.length} mensagem(ns)</p>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                     {(['all', 'sent', 'pending'] as const).map((f) => (
                         <button key={f} onClick={() => setFilter(f)} style={{
-                            padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                            padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px',
                             background: filter === f ? 'var(--purple)' : 'var(--surface)',
                             color: filter === f ? '#fff' : 'var(--text-muted)',
                             border: `1px solid ${filter === f ? 'var(--purple)' : 'var(--border)'}`,
@@ -105,58 +130,163 @@ export default function HistoricoPage() {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {messages.map((msg) => {
-                    const status = getStatus(msg)
-                    const isEditable = !msg.sent && new Date(msg.scheduled_at) > new Date()
-                    return (
-                        <div key={msg.id} style={{
-                            background: 'var(--surface)', border: '1px solid var(--border)',
-                            borderRadius: '12px', padding: '16px', boxShadow: 'var(--shadow)',
-                            borderLeft: `4px solid ${status.border}`,
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', gap: '8px' }}>
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{formatDate(msg.scheduled_at)}</span>
-                                <span style={{ fontSize: '12px', fontWeight: 600, color: status.color }}>{status.label}</span>
-                            </div>
-                            <p style={{ fontSize: '14px', marginBottom: '10px' }}>{msg.message}</p>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button onClick={() => deleteMessage(msg.id, msg.batch_id)} style={{
-                                    padding: '6px 12px', fontSize: '12px', borderRadius: '6px',
-                                    background: 'var(--danger-dim)', color: 'var(--danger)', border: 'none', cursor: 'pointer'
-                                }}>Remover {msg.batch_id ? 'Lote' : ''}</button>
-                                {isEditable && (
-                                    <button onClick={() => setEditingMsg(msg)} style={{
-                                        padding: '6px 12px', fontSize: '12px', borderRadius: '6px',
-                                        background: 'var(--purple-dim)', color: 'var(--purple)', border: 'none', cursor: 'pointer'
-                                    }}>Editar</button>
-                                )}
-                            </div>
-                        </div>
-                    )
-                })}
-            </div>
+            {loading ? (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>Carregando...</p>
+            ) : messages.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>Nenhuma mensagem encontrada.</p>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {messages.map((msg) => {
+                        const status = getStatus(msg)
+                        const isEditable = !msg.sent && new Date(msg.scheduled_at) > new Date()
+                        return (
+                            <div key={msg.id} style={{
+                                background: 'var(--surface)', border: '1px solid var(--border)',
+                                borderRadius: '12px', padding: '16px', boxShadow: 'var(--shadow)',
+                                borderLeft: `4px solid ${status.border}`,
+                            }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                        📅 {formatDate(msg.scheduled_at)}
+                                    </span>
+                                    <span style={{ fontSize: '12px', fontWeight: 600, color: status.color }}>{status.label}</span>
+                                </div>
 
+                                {msg.message && (
+                                    <p style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '10px', lineHeight: 1.5 }}>
+                                        {msg.message}
+                                    </p>
+                                )}
+
+                                {msg.files && msg.files.length > 0 && (
+                                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+                                        📎 {msg.files.length} arquivo(s)
+                                    </p>
+                                )}
+
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                    {isEditable && (
+                                        <button
+                                            onClick={() => openEdit(msg)}
+                                            style={{
+                                                padding: '6px 14px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer',
+                                                background: 'var(--purple-dim)', color: 'var(--purple)',
+                                                border: '1px solid var(--purple-light)', fontWeight: 600,
+                                            }}
+                                        >
+                                            ✏️ Editar
+                                        </button>
+                                    )}
+                                    {!msg.sent && (
+                                        <button
+                                            onClick={() => deleteMessage(msg.id, msg.batch_id)}
+                                            style={{
+                                                padding: '6px 14px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer',
+                                                background: '#fff0f0', color: 'var(--danger)',
+                                                border: '1px solid var(--danger)', fontWeight: 600,
+                                            }}
+                                        >
+                                            🗑️ Remover{msg.batch_id ? ' lote' : ''}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            )}
+
+            {/* Modal de edição — renderizado fora do loop para evitar bugs */}
             {editingMsg && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px'
-                }}>
-                    <form onSubmit={updateMessage} style={{
-                        background: 'var(--surface)', padding: '24px', borderRadius: '16px',
-                        width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '12px'
-                    }}>
-                        <h2 style={{ fontSize: '18px' }}>Editar Mensagem</h2>
-                        <textarea value={editingMsg.message || ''} onChange={e => setEditingMsg({...editingMsg, message: e.target.value})}
-                            style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid var(--border)', minHeight: '100px' }} />
-                        <SchedulePicker value={new Date(editingMsg.scheduled_at)} onChange={d => setEditingMsg({...editingMsg, scheduled_at: d.toISOString()})} />
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                            <button type="submit" style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--purple)', color: '#fff', border: 'none' }}>Salvar</button>
-                            <button type="button" onClick={() => setEditingMsg(null)} style={{ flex: 1, padding: '10px', borderRadius: '8px', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>Cancelar</button>
+                <div
+                    style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.55)', display: 'flex',
+                        alignItems: 'center', justifyContent: 'center',
+                        padding: '16px', zIndex: 1000,
+                    }}
+                    onClick={(e) => {
+                        // Fecha só se clicar no backdrop, não no modal
+                        if (e.target === e.currentTarget) closeEdit()
+                    }}
+                >
+                    <form
+                        onSubmit={updateMessage}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            background: 'var(--surface)', padding: '28px',
+                            borderRadius: '16px', width: '100%', maxWidth: '460px',
+                            display: 'flex', flexDirection: 'column', gap: '16px',
+                            boxShadow: 'var(--shadow-lg)',
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ fontSize: '18px', color: 'var(--purple-dark)' }}>Editar agendamento</h2>
+                            <button
+                                type="button"
+                                onClick={closeEdit}
+                                style={{
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    fontSize: '20px', color: 'var(--text-muted)', lineHeight: 1,
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        <div>
+                            <label style={labelStyle}>Mensagem</label>
+                            <textarea
+                                value={editMessage}
+                                onChange={e => setEditMessage(e.target.value)}
+                                rows={4}
+                                style={{
+                                    width: '100%', padding: '10px 14px', borderRadius: '10px',
+                                    border: '1px solid var(--border)', background: 'var(--surface-2)',
+                                    color: 'var(--text)', fontSize: '14px', resize: 'vertical', outline: 'none',
+                                }}
+                            />
+                        </div>
+
+                        <div>
+                            <label style={labelStyle}>Data e hora</label>
+                            <SchedulePicker value={editDate} onChange={setEditDate} />
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                style={{
+                                    flex: 1, padding: '12px', borderRadius: '8px', border: 'none',
+                                    background: saving ? 'var(--purple-light)' : 'var(--purple)',
+                                    color: '#fff', fontWeight: 700, fontSize: '14px',
+                                    cursor: saving ? 'not-allowed' : 'pointer',
+                                }}
+                            >
+                                {saving ? 'Salvando...' : 'Salvar'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={closeEdit}
+                                style={{
+                                    flex: 1, padding: '12px', borderRadius: '8px',
+                                    background: 'var(--surface-2)', border: '1px solid var(--border)',
+                                    color: 'var(--text-muted)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                                }}
+                            >
+                                Cancelar
+                            </button>
                         </div>
                     </form>
                 </div>
             )}
         </div>
     )
+}
+
+const labelStyle: React.CSSProperties = {
+    display: 'block', fontSize: '11px', fontWeight: 600,
+    color: 'var(--text-muted)', marginBottom: '6px',
+    textTransform: 'uppercase', letterSpacing: '0.06em',
 }
