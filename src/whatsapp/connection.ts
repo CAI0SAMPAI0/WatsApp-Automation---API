@@ -4,14 +4,21 @@ import makeWASocket, {
     useMultiFileAuthState,
     WASocket
 } from 'baileys'
-import { setQR, setConnected } from '../api/server'
+import { setQR, setConnected, getCurrentUserId } from '../api/server'
 import QRCode from 'qrcode'
-import { syncContacts, syncIndividualContacts } from './sync'
+import { syncContacts } from './sync'
 import { supabase } from '../supabase/client'
-
-const userID = "00000000-0000-0000-0000-000000000001"; // UUID válido temporário
+import fs from 'fs'
 
 export const createConnection = async (): Promise<WASocket> => {
+
+    if (process.env.RESET_AUTH === 'true') {
+        if (fs.existsSync('auth')) {
+            fs.rmSync('auth', { recursive: true })
+            console.log('Auth deletado, nova conexão necessária')
+        }
+    }
+
     const { version } = await fetchLatestWaWebVersion()
     const { state, saveCreds } = await useMultiFileAuthState('auth')
 
@@ -32,25 +39,24 @@ export const createConnection = async (): Promise<WASocket> => {
             setConnected(false)
             const shouldReconnect =
                 (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut
-
-            console.log('Conexão fechada. Reconectando:', shouldReconnect)
-
-            if (shouldReconnect) {
-                await createConnection()
-            }
+            if (shouldReconnect) await createConnection()
         } else if (connection === 'open') {
             setConnected(true)
             console.log('Conectado com sucesso!')
-            await syncContacts(sock, userID)  // <- sincroniza grupos ao conectar
+
+            const userID = getCurrentUserId()
+            if (!userID) {
+                console.error('Nenhum usuário conectado, ignorando sync')
+                return
+            }
+            await syncContacts(sock, userID)
         }
     })
 
-    // Captura contatos individuais quando o WhatsApp os envia
-    sock.ev.on('messaging-history.set', async ({ contacts }) => {
-        console.log(`Evento contacts.set recebido com ${contacts.length} contatos.`);
-    })
-
     sock.ev.on('groups.upsert', async (groups) => {
+        const userID = getCurrentUserId()
+        if (!userID) return
+
         const groupsToSave = groups.map((g) => ({
             jid: g.id,
             subject: g.subject,
@@ -62,7 +68,6 @@ export const createConnection = async (): Promise<WASocket> => {
             .upsert(groupsToSave, { onConflict: 'jid, user_id' })
 
         if (error) console.error('Erro ao salvar novos grupos:', error.message)
-        else console.log(`${groupsToSave.length} grupo(s) atualizados.`)
     })
 
     sock.ev.on('groups.update', async (updates) => {
@@ -72,9 +77,7 @@ export const createConnection = async (): Promise<WASocket> => {
                 .from('groups')
                 .update({ subject: update.subject })
                 .eq('jid', update.id)
-
             if (error) console.error('Erro ao atualizar grupo:', error.message)
-            else console.log(`Grupo ${update.id} atualizado: ${update.subject}`)
         }
     })
 

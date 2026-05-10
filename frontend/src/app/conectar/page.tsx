@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import QRCodeLib from 'qrcode'
+import { supabase } from '@/lib/supabase'
 
 const BOT_URL = process.env.NEXT_PUBLIC_BOT_URL || 'http://localhost:3001'
 
@@ -15,6 +16,17 @@ export default function ConectarPage() {
 
     const check = useCallback(async () => {
         try {
+            // Pega o usuário logado
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            // Envia o user_id para o bot
+            await fetch(`${BOT_URL}/connect`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.id })
+            })
+
             const res = await fetch(`${BOT_URL}/status`)
             const data = await res.json()
 
