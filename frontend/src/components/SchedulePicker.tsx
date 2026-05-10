@@ -21,15 +21,16 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
     }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        // O valor do input datetime-local é sempre local, sem timezone
-        onChange(new Date(e.target.value))
+        const local = e.target.value
+        const date = new Date(local)
+        onChange(date)
     }
 
     return (
         <div className="flex flex-col gap-3">
             <div className="flex gap-2">
                 {(['now', 'custom'] as const).map((m) => (
-                    <button key={m} onClick={() => handleMode(m)} style={{
+                    <button key={m} type='button' onClick={() => handleMode(m)} style={{
                         padding: '9px 20px', borderRadius: '8px', cursor: 'pointer',
                         fontWeight: 600, fontSize: '13px', transition: 'all 0.2s',
                         background: mode === m ? 'var(--purple)' : 'var(--surface-2)',
