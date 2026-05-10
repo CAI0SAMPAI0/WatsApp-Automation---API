@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 import { ThemeToggle } from './ThemeToggle'
 import { supabase } from '@/lib/supabase'
 
@@ -13,9 +14,10 @@ const links = [
   { href: '/conectar', label: 'Conectar' },
 ]
 
-
 export const Navbar = () => {
   const path = usePathname()
+  const [isOpen, setIsOpen] = useState(false)
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
   }
@@ -30,7 +32,7 @@ export const Navbar = () => {
       <div style={{
         maxWidth: '900px', margin: '0 auto',
         padding: '12px 24px',
-        display: 'flex', alignItems: 'center', gap: '12px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <Link href="/enviar" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
           <Image src="/tati_logo.png" alt="Taty's English" width={40} height={40}
@@ -46,7 +48,20 @@ export const Navbar = () => {
           </div>
         </Link>
 
-        <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto', alignItems: 'center' }}>
+        {/* Mobile Hamburger */}
+        <button onClick={() => setIsOpen(!isOpen)} style={{
+          display: 'block', background: 'transparent', border: 'none',
+          fontSize: '24px', cursor: 'pointer', '@media (min-width: 768px)': { display: 'none' }
+        } as React.CSSProperties}>
+          ☰
+        </button>
+
+        <div style={{
+          display: isOpen ? 'flex' : 'none', flexDirection: 'column', position: 'absolute',
+          top: '64px', left: 0, width: '100%', background: 'var(--surface)',
+          padding: '16px', gap: '8px', borderBottom: '1px solid var(--border)',
+          '@media (min-width: 768px)': { display: 'flex', flexDirection: 'row', position: 'static', width: 'auto', padding: 0, border: 'none', alignItems: 'center' }
+        } as React.CSSProperties}>
           {links.map(({ href, label }) => {
             const active = path === href || (href === '/enviar/lote' && path === '/enviar/lote')
             return (
@@ -65,7 +80,7 @@ export const Navbar = () => {
             padding: '8px 14px', borderRadius: '8px', fontSize: '13px',
             fontWeight: 500, textDecoration: 'none', transition: 'all 0.2s',
             background: 'var(--danger-dim)', color: 'var(--danger)',
-            border: '1px solid var(--danger-light)',
+            border: '1px solid var(--danger-light)', cursor: 'pointer'
           }}>
             Sair
           </button>
