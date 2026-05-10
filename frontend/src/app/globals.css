@@ -80,3 +80,24 @@ textarea,
 select {
   font-family: 'DM Sans', sans-serif;
 }
+
+.navbar-desktop { display: flex; }
+.navbar-mobile-menu { display: none; }
+.hamburger { display: none; }
+
+@media (max-width: 768px) {
+  .navbar-desktop { display: none !important; }
+  .hamburger { display: block !important; }
+  .navbar-mobile-menu {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 64px; left: 0;
+    width: 100%;
+    background: var(--surface);
+    padding: 16px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    z-index: 99;
+  }
+}

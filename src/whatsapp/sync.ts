@@ -1,4 +1,4 @@
-import { WASocket } from "baileys";
+import { WASocket } from "@whiskeysockets/baileys";
 import { supabase } from "../supabase/client.js";
 
 export const syncContacts = async (sock: WASocket, userId: string): Promise<void> => {

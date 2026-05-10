@@ -49,19 +49,15 @@ export const Navbar = () => {
         </Link>
 
         {/* Mobile Hamburger */}
-        <button onClick={() => setIsOpen(!isOpen)} style={{
-          display: 'block', background: 'transparent', border: 'none',
-          fontSize: '24px', cursor: 'pointer', '@media (min-width: 768px)': { display: 'none' }
-        } as React.CSSProperties}>
+        <button onClick={() => setIsOpen(!isOpen)} className="hamburger" style={{
+          background: 'transparent', border: 'none',
+          fontSize: '24px', cursor: 'pointer'
+        }}>
           ☰
         </button>
 
-        <div style={{
-          display: isOpen ? 'flex' : 'none', flexDirection: 'column', position: 'absolute',
-          top: '64px', left: 0, width: '100%', background: 'var(--surface)',
-          padding: '16px', gap: '8px', borderBottom: '1px solid var(--border)',
-          '@media (min-width: 768px)': { display: 'flex', flexDirection: 'row', position: 'static', width: 'auto', padding: 0, border: 'none', alignItems: 'center' }
-        } as React.CSSProperties}>
+        {/* Desktop links */}
+        <div className="navbar-desktop" style={{ gap: '4px', alignItems: 'center' }}>
           {links.map(({ href, label }) => {
             const active = path === href || (href === '/enviar/lote' && path === '/enviar/lote')
             return (
@@ -88,6 +84,38 @@ export const Navbar = () => {
             <ThemeToggle />
           </div>
         </div>
+
+        {/* Mobile menu */}
+        {isOpen && (
+          <div className="navbar-mobile-menu">
+            {links.map(({ href, label }) => {
+              const active = path === href || (href === '/enviar/lote' && path === '/enviar/lote')
+              return (
+                <Link key={href} href={href} onClick={() => setIsOpen(false)} style={{
+                  padding: '8px 14px', borderRadius: '8px', fontSize: '13px',
+                  fontWeight: 500, textDecoration: 'none', transition: 'all 0.2s',
+                  background: active ? 'var(--purple-dim)' : 'transparent',
+                  color: active ? 'var(--purple)' : 'var(--text-muted)',
+                  border: active ? '1px solid var(--purple-light)' : '1px solid transparent',
+                }}>
+                  {label}
+                </Link>
+              )
+            })}
+            <button onClick={handleLogout} style={{
+              padding: '8px 14px', borderRadius: '8px', fontSize: '13px',
+              fontWeight: 500, textDecoration: 'none', transition: 'all 0.2s',
+              background: 'var(--danger-dim)', color: 'var(--danger)',
+              border: '1px solid var(--danger-light)', cursor: 'pointer',
+              textAlign: 'left'
+            }}>
+              Sair
+            </button>
+            <div style={{ padding: '8px 14px' }}>
+              <ThemeToggle />
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   )

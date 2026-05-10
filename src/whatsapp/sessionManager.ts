@@ -2,6 +2,7 @@ import { WASocket, useMultiFileAuthState, DisconnectReason, ConnectionState } fr
 import makeWASocket from '@whiskeysockets/baileys'
 import path from 'path'
 import fs from 'fs'
+import { syncContacts } from './sync.js'
 
 const sessions = new Map<string, WASocket>()
 const qrCodes = new Map<string, string>()
@@ -21,12 +22,19 @@ export const createUserSession = async (userId: string) => {
 
     socket.ev.on('creds.update', saveCreds)
 
-    socket.ev.on('connection.update', (update: Partial<ConnectionState>) => {
+    socket.ev.on('connection.update', async (update: Partial<ConnectionState>) => {
         const { connection, lastDisconnect, qr } = update
         if (qr) qrCodes.set(userId, qr)
         if (connection === 'open') {
             qrCodes.delete(userId)
             console.log(`Sessão aberta para: ${userId}`)
+            
+            // Sincroniza grupos após conectar
+            try {
+                await syncContacts(socket, userId)
+            } catch (e) {
+                console.error('Erro ao sincronizar grupos:', e)
+            }
         }
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error as any)?.output?.statusCode !== DisconnectReason.loggedOut
