@@ -8,6 +8,7 @@ export const setConnected = (status: boolean) => { isConnected = status; if (sta
 
 export const startServer = () => {
     const app = express()
+    const PORT = process.env.PORT || 3001
 
     app.use((req, res, next) => {
         res.header('Access-Control-Allow-Origin', '*')
@@ -23,5 +24,5 @@ export const startServer = () => {
         res.json({ qr: currentQR })
     })
 
-    app.listen(3001, () => console.log('API rodando na porta 3001'))
+    app.listen(PORT, () => console.log(`API rodando na porta ${PORT}`))
 }
