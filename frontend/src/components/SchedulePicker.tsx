@@ -12,12 +12,17 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
 
     const handleMode = (m: 'now' | 'custom') => {
         setMode(m)
-        if (m === 'now') onChange(new Date(Date.now() + 5000))
+        if (m === 'now') onChange(new Date())
     }
 
     const toLocalInput = (date: Date) => {
-        const offset = date.getTimezoneOffset() * 60000
-        return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+    }
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // O valor do input datetime-local é sempre local, sem timezone
+        onChange(new Date(e.target.value))
     }
 
     return (
@@ -37,7 +42,7 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
             </div>
             {mode === 'custom' && (
                 <input type="datetime-local" value={toLocalInput(value)}
-                    onChange={(e) => onChange(new Date(e.target.value))}
+                    onChange={handleChange}
                     style={{
                         background: 'var(--surface)', border: '1px solid var(--border)',
                         borderRadius: '10px', padding: '11px 16px', color: 'var(--text)',
