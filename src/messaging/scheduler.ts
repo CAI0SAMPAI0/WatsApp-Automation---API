@@ -1,11 +1,11 @@
-import { WASocket } from 'baileys'
 import { supabase } from '../supabase/client'
 import { sendMessage } from './sender'
 import { SendType } from '../types'
+import * as SessionManager from '../whatsapp/sessionManager'
 
-const processing = new Set<string>() // IDs em andamento
+const processing = new Set<string>()
 
-export const startScheduler = (sock: WASocket): void => {
+export const startScheduler = (): void => {
     console.log('Agendador iniciado...')
 
     setInterval(async () => {
@@ -25,8 +25,15 @@ export const startScheduler = (sock: WASocket): void => {
         if (!data || data.length === 0) return
 
         for (const msg of data) {
-            if (processing.has(msg.id)) continue // já está sendo processada
+            if (processing.has(msg.id)) continue
             processing.add(msg.id)
+
+            const sock = SessionManager.getUserSession(msg.user_id)
+            if (!sock || !SessionManager.isConnected(msg.user_id)) {
+                console.warn(`Sessão indisponível para o usuário ${msg.user_id}, pulando mensagem ${msg.id}`)
+                processing.delete(msg.id)
+                continue
+            }
 
             try {
                 await sendMessage(sock, {

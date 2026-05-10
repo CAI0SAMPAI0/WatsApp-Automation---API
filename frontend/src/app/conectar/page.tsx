@@ -13,21 +13,24 @@ export default function ConectarPage() {
     const [qrImage, setQrImage] = useState<string | null>(null)
     const [connected, setConnected] = useState(false)
     const [loading, setLoading] = useState(true)
+    const [userId, setUserId] = useState<string | null>(null)
 
     const check = useCallback(async () => {
-        try {
-            // Pega o usuário logado
+        if (!userId) {
             const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
+            if (user) {
+                setUserId(user.id)
+                await fetch(`${BOT_URL}/connect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: user.id })
+                })
+            }
+            return
+        }
 
-            // Envia o user_id para o bot
-            await fetch(`${BOT_URL}/connect`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: user.id })
-            })
-
-            const res = await fetch(`${BOT_URL}/status`)
+        try {
+            const res = await fetch(`${BOT_URL}/status?user_id=${userId}`)
             const data = await res.json()
 
             if (data.connected) {
@@ -37,7 +40,7 @@ export default function ConectarPage() {
             }
 
             if (data.hasQR) {
-                const qrRes = await fetch(`${BOT_URL}/qr`)
+                const qrRes = await fetch(`${BOT_URL}/qr?user_id=${userId}`)
                 const qrData = await qrRes.json()
                 if (qrData.qr) {
                     const img = await QRCodeLib.toDataURL(qrData.qr, { width: 280 })
@@ -45,10 +48,9 @@ export default function ConectarPage() {
                 }
             }
         } catch {
-            // bot offline
         }
         setLoading(false)
-    }, [router])
+    }, [router, userId])
 
     useEffect(() => {
         check()

@@ -1,16 +1,6 @@
 import express from 'express'
 import cors from 'cors'
-
-let currentQR: string | null = null
-let isConnected = false
-let currentUserId: string | null = null
-
-export const setQR = (qr: string) => { currentQR = qr }
-export const setConnected = (status: boolean) => { 
-    isConnected = status
-    if (status) currentQR = null 
-}
-export const getCurrentUserId = () => currentUserId
+import * as SessionManager from '../whatsapp/sessionManager'
 
 export const startServer = () => {
     const app = express()
@@ -20,20 +10,27 @@ export const startServer = () => {
     app.use(express.json())
 
     app.get('/status', (req, res) => {
-        res.json({ connected: isConnected, hasQR: !!currentQR })
+        const userId = req.query.user_id as string
+        if (!userId) return res.status(400).json({ error: 'user_id required' })
+        res.json({ connected: SessionManager.isConnected(userId), hasQR: !!SessionManager.getQR(userId) })
     })
 
     app.get('/qr', (req, res) => {
-        if (!currentQR) return res.json({ qr: null })
-        res.json({ qr: currentQR })
+        const userId = req.query.user_id as string
+        if (!userId) return res.status(400).json({ error: 'user_id required' })
+        res.json({ qr: SessionManager.getQR(userId) || null })
     })
 
-    app.post('/connect', (req, res) => {
+    app.post('/connect', async (req, res) => {
         const { user_id } = req.body
         if (!user_id) return res.status(400).json({ error: 'user_id obrigatório' })
-        currentUserId = user_id
-        console.log(`Usuário ${user_id} iniciou conexão`)
-        res.json({ ok: true })
+        
+        try {
+            await SessionManager.createUserSession(user_id)
+            res.json({ ok: true })
+        } catch (err) {
+            res.status(500).json({ error: 'Erro ao conectar' })
+        }
     })
 
     app.listen(PORT, () => console.log(`API rodando na porta ${PORT}`))
