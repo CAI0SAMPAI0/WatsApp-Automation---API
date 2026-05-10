@@ -1,6 +1,5 @@
 [build]
 builder = "nixpacks"
-buildCommand = "git config --global url.'https://github.com/'.insteadOf 'git@github.com:' && git config --global url.'https://github.com/'.insteadOf 'ssh://git@github.com/' && npm install && npx tsc"
 
 [deploy]
 startCommand = "node dist/index.js"
