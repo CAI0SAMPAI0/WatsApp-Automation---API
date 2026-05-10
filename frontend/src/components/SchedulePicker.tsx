@@ -21,9 +21,10 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
     }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const local = e.target.value
-        const date = new Date(local)
-        onChange(date)
+        const [date, time] = e.target.value.split('T')
+        const [y, m, d] = date.split('-').map(Number)
+        const [h, min] = time.split(':').map(Number)
+        onChange(new Date(y, m - 1, d, h, min))  // sempre local
     }
 
     return (
