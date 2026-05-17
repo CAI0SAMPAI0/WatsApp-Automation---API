@@ -3,18 +3,18 @@ import { sendMessage } from './sender.js'
 import { SendType } from '../types/index.js'
 import * as SessionManager from '../whatsapp/sessionManager.js'
 
+const processingIds = new Set<string>()
+
 export const startScheduler = (): void => {
     console.log('Agendador iniciado...')
 
     setInterval(async () => {
         const now = new Date().toISOString()
 
-        // Busca apenas mensagens que ainda não foram enviadas e não estão em processamento
         const { data, error } = await supabase
             .from('scheduled_messages')
             .select('*')
             .eq('sent', false)
-            .eq('processing', false)
             .lte('scheduled_at', now)
 
         if (error) {
@@ -24,28 +24,31 @@ export const startScheduler = (): void => {
 
         if (!data || data.length === 0) return
 
+        console.log(`[Scheduler] ${data.length} mensagem(ns) para processar`)
+
         for (const msg of data) {
+            if (processingIds.has(msg.id)) {
+                console.log(`[Scheduler] Mensagem ${msg.id} já em processamento, pulando`)
+                continue
+            }
+
+            const isConnected = SessionManager.isConnected(msg.user_id)
             const sock = SessionManager.getUserSession(msg.user_id)
-            if (!sock || !SessionManager.isConnected(msg.user_id)) {
-                console.warn(`Sessão indisponível para o usuário ${msg.user_id}, pulando mensagem ${msg.id}`)
+
+            console.log(`[Scheduler] Mensagem ${msg.id} | user: ${msg.user_id} | conectado: ${isConnected} | sock: ${!!sock}`)
+
+            if (!sock || !isConnected) {
+                console.warn(`[Scheduler] Sessão indisponível para ${msg.user_id}, pulando mensagem ${msg.id}`)
                 continue
             }
 
-            // Marca como em processamento ANTES de enviar para evitar reprocessamento
-            const { error: lockError } = await supabase
-                .from('scheduled_messages')
-                .update({ processing: true })
-                .eq('id', msg.id)
-                .eq('processing', false) // double-check: só atualiza se ainda for false
+            processingIds.add(msg.id)
 
-            if (lockError) {
-                console.warn(`Não foi possível travar mensagem ${msg.id}, pulando.`)
-                continue
-            }
-
-            // Processa de forma assíncrona sem bloquear o loop
             ;(async () => {
                 try {
+                    console.log(`[Scheduler] Enviando mensagem ${msg.id} para ${msg.contact_jid}`)
+                    console.log(`[Scheduler] Tipo: ${msg.send_type} | Tem mensagem: ${!!msg.message} | Arquivos: ${msg.files?.length ?? 0}`)
+
                     await sendMessage(sock, {
                         contact_jid: msg.contact_jid,
                         send_type: msg.send_type as SendType,
@@ -54,19 +57,20 @@ export const startScheduler = (): void => {
                         scheduled_at: new Date(msg.scheduled_at)
                     })
 
-                    await supabase
+                    const { error: updateError } = await supabase
                         .from('scheduled_messages')
-                        .update({ sent: true, processing: false })
+                        .update({ sent: true })
                         .eq('id', msg.id)
 
-                    console.log(`Mensagem ${msg.id} enviada com sucesso.`)
+                    if (updateError) {
+                        console.error(`[Scheduler] Erro ao marcar mensagem ${msg.id} como enviada:`, updateError.message)
+                    } else {
+                        console.log(`[Scheduler] ✅ Mensagem ${msg.id} enviada e marcada com sucesso`)
+                    }
                 } catch (err) {
-                    console.error(`Falha ao enviar mensagem ${msg.id}:`, err)
-                    // Libera o lock para tentar novamente na próxima rodada
-                    await supabase
-                        .from('scheduled_messages')
-                        .update({ processing: false })
-                        .eq('id', msg.id)
+                    console.error(`[Scheduler] ❌ Falha ao enviar mensagem ${msg.id}:`, err)
+                } finally {
+                    processingIds.delete(msg.id)
                 }
             })()
         }
