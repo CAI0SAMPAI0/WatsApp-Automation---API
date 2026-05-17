@@ -15,13 +15,14 @@ const toDateStr = (d: Date) =>
 const toTimeStr = (d: Date) =>
     `${pad(d.getHours())}:${pad(d.getMinutes())}`
 
+/**
+ * Serializa para UTC puro (ISO 8601 com Z).
+ * O Supabase armazena timestamptz em UTC e compara em UTC.
+ * Usar offset local causava bug onde "18:00-03:00" era salvo mas comparado
+ * com "now() UTC" de forma incorreta em alguns drivers/versões.
+ */
 export const toLocalISOString = (d: Date): string => {
-    const offset = -d.getTimezoneOffset()
-    const sign = offset >= 0 ? '+' : '-'
-    const absOffset = Math.abs(offset)
-    const hh = pad(Math.floor(absOffset / 60))
-    const mm = pad(absOffset % 60)
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${hh}:${mm}`
+    return d.toISOString() // sempre UTC, ex: "2025-05-17T21:00:00.000Z"
 }
 
 /** Retorna data arredondada para o próximo minuto cheio + N minutos */
