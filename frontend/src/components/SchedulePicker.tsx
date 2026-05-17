@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 interface Props {
     value: Date
     onChange: (date: Date) => void
@@ -13,7 +15,22 @@ const toDateStr = (d: Date) =>
 const toTimeStr = (d: Date) =>
     `${pad(d.getHours())}:${pad(d.getMinutes())}`
 
+// Retorna new Date() local + 2 minutos, segundos zerados
+const nowPlus2 = (): Date => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() + 2)
+    d.setSeconds(0, 0)
+    return d
+}
+
 export const SchedulePicker = ({ value, onChange }: Props) => {
+    // Evita hydration mismatch: só renderiza inputs no cliente
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
+
     const handleDate = (e: React.ChangeEvent<HTMLInputElement>) => {
         const [y, m, d] = e.target.value.split('-').map(Number)
         const next = new Date(value)
@@ -28,25 +45,26 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
         onChange(next)
     }
 
-    const handleNow = () => onChange(new Date())
+    if (!mounted) {
+        return <div style={{ height: '88px', background: 'var(--surface-2)', borderRadius: '10px', opacity: 0.4 }} />
+    }
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                    type="button"
-                    onClick={handleNow}
-                    style={{
-                        padding: '9px 20px', borderRadius: '8px', cursor: 'pointer',
-                        fontWeight: 600, fontSize: '13px', transition: 'all 0.2s',
-                        background: 'var(--surface-2)',
-                        color: 'var(--text-muted)',
-                        border: '1px solid var(--border)',
-                    }}
-                >
-                    ⚡ Agora
-                </button>
-            </div>
+            <button
+                type="button"
+                onClick={() => onChange(nowPlus2())}
+                style={{
+                    alignSelf: 'flex-start',
+                    padding: '8px 18px', borderRadius: '8px', cursor: 'pointer',
+                    fontWeight: 600, fontSize: '13px', transition: 'all 0.2s',
+                    background: 'var(--surface-2)',
+                    color: 'var(--text-muted)',
+                    border: '1px solid var(--border)',
+                }}
+            >
+                ⚡ Agora (+2 min)
+            </button>
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: '140px' }}>
@@ -71,10 +89,12 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
 
             <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '-4px' }}>
                 🕐 Agendado para:{' '}
-                {value.toLocaleString('pt-BR', {
-                    day: '2-digit', month: '2-digit', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit',
-                })}
+                <strong style={{ color: 'var(--purple)' }}>
+                    {value.toLocaleString('pt-BR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit',
+                    })}
+                </strong>
             </p>
         </div>
     )

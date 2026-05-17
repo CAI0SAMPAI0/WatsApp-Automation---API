@@ -11,7 +11,7 @@ export default function EnviarPage() {
     const [sendType, setSendType] = useState<SendType>('text')
     const [message, setMessage] = useState('')
     const [files, setFiles] = useState<File[]>([])
-    const [scheduledAt, setScheduledAt] = useState<Date>(new Date())
+    const [scheduledAt, setScheduledAt] = useState<Date>(() => { if (typeof window === "undefined") return new Date(); const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -76,6 +76,7 @@ export default function EnviarPage() {
             setContact(null)
             setMessage('')
             setFiles([])
+            setScheduledAt(() => { const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)

@@ -24,7 +24,7 @@ const newItem = (): BatchItem => ({
 
 export default function LotePage() {
     const [items, setItems] = useState<BatchItem[]>([newItem()])
-    const [scheduledAt, setScheduledAt] = useState<Date>(new Date())
+    const [scheduledAt, setScheduledAt] = useState<Date>(() => { if (typeof window === "undefined") return new Date(); const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -100,6 +100,7 @@ export default function LotePage() {
 
             setSuccess(true)
             setItems([newItem()])
+            setScheduledAt(() => { const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)
