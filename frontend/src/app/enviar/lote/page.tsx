@@ -56,6 +56,16 @@ export default function LotePage() {
         return { url: data.publicUrl, type: getFileType(file), name: file.name }
     }
 
+    // FIX: captura arquivos antes de resetar; usa functional update para evitar closure stale
+    const handleFileChange = (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        const selected = Array.from(e.target.files ?? [])
+        e.target.value = ''
+        if (selected.length === 0) return
+        setItems(prev => prev.map(i =>
+            i.id === itemId ? { ...i, files: [...i.files, ...selected] } : i
+        ))
+    }
+
     const handleSubmit = async () => {
         for (const item of items) {
             if (!item.contact) return alert('Selecione um contato em todos os itens')
@@ -66,7 +76,6 @@ export default function LotePage() {
 
         setLoading(true)
         try {
-            // Pega o usuário logado
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('Usuário não autenticado')
 
@@ -82,7 +91,7 @@ export default function LotePage() {
                     send_type: item.sendType,
                     scheduled_at: scheduledAt.toISOString(),
                     sent: false,
-                    user_id: user.id, // <-- salva quem agendou
+                    user_id: user.id,
                 }
             }))
 
@@ -92,8 +101,8 @@ export default function LotePage() {
             setSuccess(true)
             setItems([newItem()])
             setTimeout(() => setSuccess(false), 4000)
-        } catch (err: any) {
-            alert('Erro: ' + err.message)
+        } catch (err: unknown) {
+            alert('Erro: ' + (err as Error).message)
         } finally {
             setLoading(false)
         }
@@ -117,7 +126,10 @@ export default function LotePage() {
                         borderRadius: '14px', padding: '20px',
                         boxShadow: '0 1px 6px rgba(123,94,167,0.06)',
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div style={{
+                            display: 'flex', justifyContent: 'space-between',
+                            alignItems: 'center', marginBottom: '16px',
+                        }}>
                             <span style={{
                                 fontFamily: 'Playfair Display, serif', fontWeight: 700,
                                 color: 'var(--purple)', fontSize: '15px',
@@ -137,13 +149,15 @@ export default function LotePage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div>
                                 <label style={labelStyle}>Contato ou grupo</label>
-                                <ContactSearch selected={item.contact}
-                                    onSelect={(c) => update(item.id, { contact: c })} />
+                                <ContactSearch
+                                    selected={item.contact}
+                                    onSelect={(c) => update(item.id, { contact: c })}
+                                />
                             </div>
 
                             <div>
                                 <label style={labelStyle}>Tipo de envio</label>
-                                <div className="flex gap-2 flex-wrap">
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                     {(['text', 'file', 'both'] as SendType[]).map((t) => (
                                         <button key={t} onClick={() => update(item.id, { sendType: t })} style={{
                                             padding: '7px 14px', borderRadius: '7px', cursor: 'pointer',
@@ -161,27 +175,34 @@ export default function LotePage() {
                             {(item.sendType === 'text' || item.sendType === 'both') && (
                                 <div>
                                     <label style={labelStyle}>Mensagem</label>
-                                    <textarea value={item.message}
+                                    <textarea
+                                        value={item.message}
                                         onChange={e => update(item.id, { message: e.target.value })}
-                                        rows={3} placeholder="Digite a mensagem..."
-                                        style={{ ...inputStyle, width: '100%', resize: 'none' }} />
+                                        rows={3}
+                                        placeholder="Digite a mensagem..."
+                                        style={{ ...inputStyle, width: '100%', resize: 'none' }}
+                                    />
                                 </div>
                             )}
 
                             {(item.sendType === 'file' || item.sendType === 'both') && (
                                 <div>
-                                    <label style={labelStyle}>Arquivos {item.files.length > 0 ? `(${item.files.length})` : ''}</label>
+                                    <label style={labelStyle}>
+                                        Arquivos {item.files.length > 0 ? `(${item.files.length})` : ''}
+                                    </label>
                                     <label style={{
                                         display: 'block', border: '2px dashed var(--purple-light)',
                                         borderRadius: '10px', padding: '14px', textAlign: 'center',
                                         cursor: 'pointer', background: 'var(--purple-dim)',
                                     }}>
-                                        <input type="file" multiple style={{ display: 'none' }}
-                                            onChange={e => {
-                                                const selected = Array.from(e.target.files ?? [])
-                                                update(item.id, { files: [...item.files, ...selected] })
-                                                e.target.value = ''
-                                            }} />
+                                        {/* FIX: key força remount após cada seleção */}
+                                        <input
+                                            key={item.files.length}
+                                            type="file"
+                                            multiple
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => handleFileChange(item.id, e)}
+                                        />
                                         <p style={{ color: 'var(--purple)', fontWeight: 600, fontSize: '13px' }}>
                                             Clique para selecionar arquivos
                                         </p>
@@ -189,14 +210,21 @@ export default function LotePage() {
                                     {item.files.length > 0 && (
                                         <ul style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                             {item.files.map((f, i) => (
-                                                <li key={i} style={{
+                                                <li key={`${f.name}-${i}`} style={{
                                                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                                     background: 'var(--surface-2)', borderRadius: '6px',
                                                     padding: '6px 12px', fontSize: '12px',
                                                 }}>
                                                     <span>📄 {f.name}</span>
-                                                    <button onClick={() => update(item.id, { files: item.files.filter((_, j) => j !== i) })}
-                                                        style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '11px' }}>
+                                                    <button
+                                                        onClick={() => update(item.id, {
+                                                            files: item.files.filter((_, j) => j !== i)
+                                                        })}
+                                                        style={{
+                                                            color: 'var(--danger)', background: 'none',
+                                                            border: 'none', cursor: 'pointer', fontSize: '11px',
+                                                        }}
+                                                    >
                                                         remover
                                                     </button>
                                                 </li>
@@ -229,7 +257,8 @@ export default function LotePage() {
             </div>
 
             <button onClick={handleSubmit} disabled={loading} style={{
-                width: '100%', background: loading ? 'var(--purple-light)' : 'var(--purple)',
+                width: '100%',
+                background: loading ? 'var(--purple-light)' : 'var(--purple)',
                 color: '#fff', fontWeight: 700, fontSize: '15px',
                 padding: '14px 24px', borderRadius: '10px', border: 'none',
                 cursor: loading ? 'not-allowed' : 'pointer',

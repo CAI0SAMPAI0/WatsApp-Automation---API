@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { SchedulePicker } from '@/components/SchedulePicker'
 
@@ -18,19 +18,17 @@ interface Message {
 
 const getStatus = (msg: Message) => {
     if (msg.sent) return { label: '✓ Enviado', color: 'var(--success)', bg: '#f0faf5', border: 'var(--success)' }
-    const now = new Date()
     const scheduled = new Date(msg.scheduled_at)
-    if (scheduled <= now) return { label: '⟳ Enviando...', color: 'var(--warning)', bg: '#fff8ec', border: 'var(--warning)' }
+    if (scheduled <= new Date()) return { label: '⟳ Enviando...', color: 'var(--warning)', bg: '#fff8ec', border: 'var(--warning)' }
     return { label: '⏳ Agendado', color: 'var(--purple)', bg: 'var(--purple-dim)', border: 'var(--purple-light)' }
 }
 
-const formatDate = (iso: string) => {
-    return new Date(iso).toLocaleString('pt-BR', {
+const formatDate = (iso: string) =>
+    new Date(iso).toLocaleString('pt-BR', {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
         timeZone: 'America/Sao_Paulo',
     })
-}
 
 export default function HistoricoPage() {
     const [messages, setMessages] = useState<Message[]>([])
@@ -40,18 +38,19 @@ export default function HistoricoPage() {
     const [editMessage, setEditMessage] = useState('')
     const [editDate, setEditDate] = useState<Date>(new Date())
     const [saving, setSaving] = useState(false)
+    const userIdRef = useRef<string | null>(null)
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (userId?: string) => {
+        const uid = userId ?? userIdRef.current
+        if (!uid) return
         setLoading(true)
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { setLoading(false); return }
 
         let query = supabase
             .from('scheduled_messages')
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', uid)
             .order('scheduled_at', { ascending: false })
-            .limit(50)
+            .limit(100)
 
         if (filter === 'sent') query = query.eq('sent', true)
         if (filter === 'pending') query = query.eq('sent', false)
@@ -61,7 +60,34 @@ export default function HistoricoPage() {
         setLoading(false)
     }, [filter])
 
-    useEffect(() => { load() }, [load])
+    useEffect(() => {
+        let channel: ReturnType<typeof supabase.channel> | null = null
+
+        const init = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            userIdRef.current = user.id
+            await load(user.id)
+
+            // Realtime subscription
+            channel = supabase
+                .channel('scheduled_messages_changes')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'scheduled_messages',
+                        filter: `user_id=eq.${user.id}`,
+                    },
+                    () => { load(user.id) }
+                )
+                .subscribe()
+        }
+
+        init()
+        return () => { channel && supabase.removeChannel(channel) }
+    }, [load])
 
     const openEdit = (msg: Message) => {
         setEditingMsg(msg)
@@ -80,16 +106,27 @@ export default function HistoricoPage() {
         if (!editingMsg) return
         setSaving(true)
         try {
-            const { error } = await supabase.from('scheduled_messages').update({
-                message: editMessage,
+            const updates: Record<string, unknown> = {
                 scheduled_at: editDate.toISOString(),
-            }).eq('id', editingMsg.id)
+            }
+            // Só atualiza texto se a mensagem tem texto
+            if (editingMsg.send_type !== 'file') {
+                updates.message = editMessage
+            }
+            // Se era enviado, marca como não enviado para reenviar
+            if (editingMsg.sent) {
+                updates.sent = false
+            }
+
+            const { error } = await supabase
+                .from('scheduled_messages')
+                .update(updates)
+                .eq('id', editingMsg.id)
 
             if (error) throw error
             closeEdit()
-            await load()
-        } catch (err: any) {
-            alert('Erro ao salvar: ' + err.message)
+        } catch (err: unknown) {
+            alert('Erro ao salvar: ' + (err as Error).message)
         } finally {
             setSaving(false)
         }
@@ -103,18 +140,24 @@ export default function HistoricoPage() {
             } else {
                 await supabase.from('scheduled_messages').delete().eq('id', id)
             }
-            await load()
-        } catch (err: any) {
-            alert('Erro ao remover: ' + err.message)
+        } catch (err: unknown) {
+            alert('Erro ao remover: ' + (err as Error).message)
         }
     }
 
     return (
         <div style={{ maxWidth: '720px', margin: '0 auto', padding: '16px' }}>
-            <div style={{ marginBottom: '28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{
+                marginBottom: '28px', display: 'flex', alignItems: 'flex-end',
+                justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px',
+            }}>
                 <div>
-                    <h1 style={{ fontSize: '30px', color: 'var(--purple-dark)', marginBottom: '4px' }}>Histórico</h1>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>{messages.length} mensagem(ns)</p>
+                    <h1 style={{ fontSize: '30px', color: 'var(--purple-dark)', marginBottom: '4px' }}>
+                        Histórico
+                    </h1>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                        {messages.length} mensagem(ns) • atualização em tempo real
+                    </p>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
                     {(['all', 'sent', 'pending'] as const).map((f) => (
@@ -131,29 +174,40 @@ export default function HistoricoPage() {
             </div>
 
             {loading ? (
-                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>Carregando...</p>
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
+                    Carregando...
+                </p>
             ) : messages.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>Nenhuma mensagem encontrada.</p>
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
+                    Nenhuma mensagem encontrada.
+                </p>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {messages.map((msg) => {
                         const status = getStatus(msg)
-                        const isEditable = !msg.sent && new Date(msg.scheduled_at) > new Date()
                         return (
                             <div key={msg.id} style={{
                                 background: 'var(--surface)', border: '1px solid var(--border)',
                                 borderRadius: '12px', padding: '16px', boxShadow: 'var(--shadow)',
                                 borderLeft: `4px solid ${status.border}`,
                             }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+                                <div style={{
+                                    display: 'flex', justifyContent: 'space-between',
+                                    marginBottom: '8px', gap: '8px', flexWrap: 'wrap',
+                                }}>
                                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                                         📅 {formatDate(msg.scheduled_at)}
                                     </span>
-                                    <span style={{ fontSize: '12px', fontWeight: 600, color: status.color }}>{status.label}</span>
+                                    <span style={{ fontSize: '12px', fontWeight: 600, color: status.color }}>
+                                        {status.label}
+                                    </span>
                                 </div>
 
                                 {msg.message && (
-                                    <p style={{ fontSize: '14px', color: 'var(--text)', marginBottom: '10px', lineHeight: 1.5 }}>
+                                    <p style={{
+                                        fontSize: '14px', color: 'var(--text)',
+                                        marginBottom: '10px', lineHeight: 1.5,
+                                    }}>
                                         {msg.message}
                                     </p>
                                 )}
@@ -165,30 +219,30 @@ export default function HistoricoPage() {
                                 )}
 
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    {isEditable && (
-                                        <button
-                                            onClick={() => openEdit(msg)}
-                                            style={{
-                                                padding: '6px 14px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer',
-                                                background: 'var(--purple-dim)', color: 'var(--purple)',
-                                                border: '1px solid var(--purple-light)', fontWeight: 600,
-                                            }}
-                                        >
-                                            ✏️ Editar
-                                        </button>
-                                    )}
-                                    {!msg.sent && (
-                                        <button
-                                            onClick={() => deleteMessage(msg.id, msg.batch_id)}
-                                            style={{
-                                                padding: '6px 14px', fontSize: '12px', borderRadius: '6px', cursor: 'pointer',
-                                                background: '#fff0f0', color: 'var(--danger)',
-                                                border: '1px solid var(--danger)', fontWeight: 600,
-                                            }}
-                                        >
-                                            🗑️ Remover{msg.batch_id ? ' lote' : ''}
-                                        </button>
-                                    )}
+                                    {/* Editar disponível para qualquer mensagem */}
+                                    <button
+                                        onClick={() => openEdit(msg)}
+                                        style={{
+                                            padding: '6px 14px', fontSize: '12px', borderRadius: '6px',
+                                            cursor: 'pointer', background: 'var(--purple-dim)',
+                                            color: 'var(--purple)', border: '1px solid var(--purple-light)',
+                                            fontWeight: 600,
+                                        }}
+                                    >
+                                        ✏️ Editar{msg.sent ? ' & Reenviar' : ''}
+                                    </button>
+
+                                    <button
+                                        onClick={() => deleteMessage(msg.id, msg.batch_id)}
+                                        style={{
+                                            padding: '6px 14px', fontSize: '12px', borderRadius: '6px',
+                                            cursor: 'pointer', background: '#fff0f0',
+                                            color: 'var(--danger)', border: '1px solid var(--danger)',
+                                            fontWeight: 600,
+                                        }}
+                                    >
+                                        🗑️ Remover{msg.batch_id ? ' lote' : ''}
+                                    </button>
                                 </div>
                             </div>
                         )
@@ -196,7 +250,7 @@ export default function HistoricoPage() {
                 </div>
             )}
 
-            {/* Modal de edição — renderizado fora do loop para evitar bugs */}
+            {/* Modal de edição */}
             {editingMsg && (
                 <div
                     style={{
@@ -205,23 +259,29 @@ export default function HistoricoPage() {
                         alignItems: 'center', justifyContent: 'center',
                         padding: '16px', zIndex: 1000,
                     }}
-                    onClick={(e) => {
-                        // Fecha só se clicar no backdrop, não no modal
-                        if (e.target === e.currentTarget) closeEdit()
-                    }}
+                    onClick={(e) => { if (e.target === e.currentTarget) closeEdit() }}
                 >
                     <form
                         onSubmit={updateMessage}
                         onClick={(e) => e.stopPropagation()}
                         style={{
                             background: 'var(--surface)', padding: '28px',
-                            borderRadius: '16px', width: '100%', maxWidth: '460px',
+                            borderRadius: '16px', width: '100%', maxWidth: '480px',
                             display: 'flex', flexDirection: 'column', gap: '16px',
                             boxShadow: 'var(--shadow-lg)',
                         }}
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h2 style={{ fontSize: '18px', color: 'var(--purple-dark)' }}>Editar agendamento</h2>
+                            <div>
+                                <h2 style={{ fontSize: '18px', color: 'var(--purple-dark)' }}>
+                                    Editar agendamento
+                                </h2>
+                                {editingMsg.sent && (
+                                    <p style={{ fontSize: '12px', color: 'var(--warning)', marginTop: '4px' }}>
+                                        ⚠️ Será marcada como não enviada e reenviada no horário escolhido
+                                    </p>
+                                )}
+                            </div>
                             <button
                                 type="button"
                                 onClick={closeEdit}
@@ -234,19 +294,22 @@ export default function HistoricoPage() {
                             </button>
                         </div>
 
-                        <div>
-                            <label style={labelStyle}>Mensagem</label>
-                            <textarea
-                                value={editMessage}
-                                onChange={e => setEditMessage(e.target.value)}
-                                rows={4}
-                                style={{
-                                    width: '100%', padding: '10px 14px', borderRadius: '10px',
-                                    border: '1px solid var(--border)', background: 'var(--surface-2)',
-                                    color: 'var(--text)', fontSize: '14px', resize: 'vertical', outline: 'none',
-                                }}
-                            />
-                        </div>
+                        {editingMsg.send_type !== 'file' && (
+                            <div>
+                                <label style={labelStyle}>Mensagem</label>
+                                <textarea
+                                    value={editMessage}
+                                    onChange={e => setEditMessage(e.target.value)}
+                                    rows={4}
+                                    style={{
+                                        width: '100%', padding: '10px 14px', borderRadius: '10px',
+                                        border: '1px solid var(--border)', background: 'var(--surface-2)',
+                                        color: 'var(--text)', fontSize: '14px',
+                                        resize: 'vertical', outline: 'none',
+                                    }}
+                                />
+                            </div>
+                        )}
 
                         <div>
                             <label style={labelStyle}>Data e hora</label>
@@ -264,7 +327,7 @@ export default function HistoricoPage() {
                                     cursor: saving ? 'not-allowed' : 'pointer',
                                 }}
                             >
-                                {saving ? 'Salvando...' : 'Salvar'}
+                                {saving ? 'Salvando...' : editingMsg.sent ? 'Salvar & Reenviar' : 'Salvar'}
                             </button>
                             <button
                                 type="button"
@@ -272,7 +335,8 @@ export default function HistoricoPage() {
                                 style={{
                                     flex: 1, padding: '12px', borderRadius: '8px',
                                     background: 'var(--surface-2)', border: '1px solid var(--border)',
-                                    color: 'var(--text-muted)', fontWeight: 600, fontSize: '14px', cursor: 'pointer',
+                                    color: 'var(--text-muted)', fontWeight: 600,
+                                    fontSize: '14px', cursor: 'pointer',
                                 }}
                             >
                                 Cancelar

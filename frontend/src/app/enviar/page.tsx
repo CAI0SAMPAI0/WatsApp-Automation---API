@@ -30,15 +30,19 @@ export default function EnviarPage() {
 
     const uploadFile = async (file: File): Promise<MessageFile> => {
         const path = `uploads/${Date.now()}-${file.name}`
-        const { data, error } = await supabase.storage.from('message-files')
+        const { error } = await supabase.storage.from('message-files')
             .upload(path, file, { contentType: file.type })
         if (error) throw new Error('Erro ao fazer upload: ' + error.message)
         const { data: urlData } = supabase.storage.from('message-files').getPublicUrl(path)
         return { url: urlData.publicUrl, type: getFileType(file), name: file.name }
     }
 
+    // FIX: captura os arquivos antes de resetar o input
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setFiles(prev => [...prev, ...Array.from(e.target.files ?? [])])
+        const selected = Array.from(e.target.files ?? [])
+        if (selected.length > 0) {
+            setFiles(prev => [...prev, ...selected])
+        }
         e.target.value = ''
     }
 
@@ -50,7 +54,6 @@ export default function EnviarPage() {
 
         setLoading(true)
         try {
-            // Pega o usuário logado
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('Usuário não autenticado')
 
@@ -65,15 +68,17 @@ export default function EnviarPage() {
                 send_type: sendType,
                 scheduled_at: scheduledAt.toISOString(),
                 sent: false,
-                user_id: user.id, // <-- salva quem agendou
+                user_id: user.id,
             })
             if (error) throw error
 
             setSuccess(true)
-            setContact(null); setMessage(''); setFiles([])
+            setContact(null)
+            setMessage('')
+            setFiles([])
             setTimeout(() => setSuccess(false), 4000)
-        } catch (err: any) {
-            alert('Erro: ' + err.message)
+        } catch (err: unknown) {
+            alert('Erro: ' + (err as Error).message)
         } finally {
             setLoading(false)
         }
@@ -96,7 +101,7 @@ export default function EnviarPage() {
                 </Field>
 
                 <Field label="Tipo de envio">
-                    <div className="flex gap-2 flex-wrap">
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         {(['text', 'file', 'both'] as SendType[]).map((t) => (
                             <button key={t} onClick={() => setSendType(t)} style={{
                                 padding: '9px 20px', borderRadius: '8px', cursor: 'pointer',
@@ -113,20 +118,31 @@ export default function EnviarPage() {
 
                 {(sendType === 'text' || sendType === 'both') && (
                     <Field label="Mensagem">
-                        <textarea value={message} onChange={e => setMessage(e.target.value)}
-                            rows={4} placeholder="Digite sua mensagem..."
-                            style={{ ...inputStyle, width: '100%', resize: 'none' }} />
+                        <textarea
+                            value={message}
+                            onChange={e => setMessage(e.target.value)}
+                            rows={4}
+                            placeholder="Digite sua mensagem..."
+                            style={{ ...inputStyle, width: '100%', resize: 'none' }}
+                        />
                     </Field>
                 )}
 
                 {(sendType === 'file' || sendType === 'both') && (
-                    <Field label={`Arquivos ${files.length > 0 ? `(${files.length})` : ''}`}>
+                    <Field label={`Arquivos${files.length > 0 ? ` (${files.length})` : ''}`}>
                         <label style={{
                             display: 'block', border: '2px dashed var(--purple-light)',
                             borderRadius: '10px', padding: '20px', textAlign: 'center',
                             cursor: 'pointer', background: 'var(--purple-dim)',
                         }}>
-                            <input type="file" multiple onChange={handleFileChange} style={{ display: 'none' }} />
+                            {/* FIX: key força remount do input após cada seleção */}
+                            <input
+                                key={files.length}
+                                type="file"
+                                multiple
+                                onChange={handleFileChange}
+                                style={{ display: 'none' }}
+                            />
                             <p style={{ color: 'var(--purple)', fontWeight: 600, fontSize: '14px' }}>
                                 Clique para selecionar arquivos
                             </p>
@@ -137,14 +153,19 @@ export default function EnviarPage() {
                         {files.length > 0 && (
                             <ul style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                 {files.map((f, i) => (
-                                    <li key={i} style={{
+                                    <li key={`${f.name}-${i}`} style={{
                                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                         background: 'var(--surface)', border: '1px solid var(--border)',
                                         borderRadius: '8px', padding: '8px 14px', fontSize: '13px',
                                     }}>
                                         <span style={{ color: 'var(--purple-dark)' }}>📄 {f.name}</span>
-                                        <button onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
-                                            style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px' }}>
+                                        <button
+                                            onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                                            style={{
+                                                color: 'var(--danger)', background: 'none',
+                                                border: 'none', cursor: 'pointer', fontSize: '12px',
+                                            }}
+                                        >
                                             remover
                                         </button>
                                     </li>
@@ -158,14 +179,18 @@ export default function EnviarPage() {
                     <SchedulePicker value={scheduledAt} onChange={setScheduledAt} />
                 </Field>
 
-                <button onClick={handleSubmit} disabled={loading} style={{
-                    background: loading ? 'var(--purple-light)' : 'var(--purple)',
-                    color: '#fff', fontWeight: 700, fontSize: '15px',
-                    padding: '14px 24px', borderRadius: '10px', border: 'none',
-                    cursor: loading ? 'not-allowed' : 'pointer',
-                    boxShadow: loading ? 'none' : 'var(--shadow)',
-                    transition: 'all 0.2s', width: '100%',
-                }}>
+                <button
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    style={{
+                        background: loading ? 'var(--purple-light)' : 'var(--purple)',
+                        color: '#fff', fontWeight: 700, fontSize: '15px',
+                        padding: '14px 24px', borderRadius: '10px', border: 'none',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        boxShadow: loading ? 'none' : 'var(--shadow)',
+                        transition: 'all 0.2s', width: '100%',
+                    }}
+                >
                     {loading ? 'Agendando...' : 'Agendar envio'}
                 </button>
 
