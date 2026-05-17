@@ -15,7 +15,17 @@ const toDateStr = (d: Date) =>
 const toTimeStr = (d: Date) =>
     `${pad(d.getHours())}:${pad(d.getMinutes())}`
 
-// Retorna new Date() local + 2 minutos, segundos zerados
+// Serializa Date para ISO com offset local (ex: 2025-05-17T18:07:00-03:00)
+// Isso evita que .toISOString() converta para UTC e cause o deslocamento de 3h
+export const toLocalISOString = (d: Date): string => {
+    const offset = -d.getTimezoneOffset()
+    const sign = offset >= 0 ? '+' : '-'
+    const absOffset = Math.abs(offset)
+    const hh = pad(Math.floor(absOffset / 60))
+    const mm = pad(absOffset % 60)
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${hh}:${mm}`
+}
+
 const nowPlus2 = (): Date => {
     const d = new Date()
     d.setMinutes(d.getMinutes() + 2)
@@ -24,7 +34,6 @@ const nowPlus2 = (): Date => {
 }
 
 export const SchedulePicker = ({ value, onChange }: Props) => {
-    // Evita hydration mismatch: só renderiza inputs no cliente
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => {

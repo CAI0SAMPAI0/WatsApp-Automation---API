@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { SchedulePicker } from '@/components/SchedulePicker'
+import { SchedulePicker, toLocalISOString } from '@/components/SchedulePicker'
 
 interface Message {
     id: string
@@ -69,7 +69,6 @@ export default function HistoricoPage() {
             userIdRef.current = user.id
             await load(user.id)
 
-            // Realtime subscription
             channel = supabase
                 .channel('scheduled_messages_changes')
                 .on(
@@ -107,13 +106,11 @@ export default function HistoricoPage() {
         setSaving(true)
         try {
             const updates: Record<string, unknown> = {
-                scheduled_at: editDate.toISOString(),
+                scheduled_at: toLocalISOString(editDate),
             }
-            // Só atualiza texto se a mensagem tem texto
             if (editingMsg.send_type !== 'file') {
                 updates.message = editMessage
             }
-            // Se era enviado, marca como não enviado para reenviar
             if (editingMsg.sent) {
                 updates.sent = false
             }
@@ -219,7 +216,6 @@ export default function HistoricoPage() {
                                 )}
 
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    {/* Editar disponível para qualquer mensagem */}
                                     <button
                                         onClick={() => openEdit(msg)}
                                         style={{
@@ -250,7 +246,6 @@ export default function HistoricoPage() {
                 </div>
             )}
 
-            {/* Modal de edição */}
             {editingMsg && (
                 <div
                     style={{

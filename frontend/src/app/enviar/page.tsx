@@ -2,16 +2,23 @@
 
 import { useState } from 'react'
 import { ContactSearch } from '@/components/ContactSearch'
-import { SchedulePicker } from '@/components/SchedulePicker'
+import { SchedulePicker, toLocalISOString } from '@/components/SchedulePicker'
 import { supabase } from '@/lib/supabase'
 import { Contact, SendType, MessageFile } from '@/types'
+
+const nowPlus2 = () => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() + 2)
+    d.setSeconds(0, 0)
+    return d
+}
 
 export default function EnviarPage() {
     const [contact, setContact] = useState<Contact | null>(null)
     const [sendType, setSendType] = useState<SendType>('text')
     const [message, setMessage] = useState('')
     const [files, setFiles] = useState<File[]>([])
-    const [scheduledAt, setScheduledAt] = useState<Date>(() => { if (typeof window === "undefined") return new Date(); const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
+    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus2)
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -37,7 +44,6 @@ export default function EnviarPage() {
         return { url: urlData.publicUrl, type: getFileType(file), name: file.name }
     }
 
-    // FIX: captura os arquivos antes de resetar o input
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selected = Array.from(e.target.files ?? [])
         if (selected.length > 0) {
@@ -66,7 +72,7 @@ export default function EnviarPage() {
                 message: sendType !== 'file' ? message : undefined,
                 files: uploadedFiles.length > 0 ? uploadedFiles : null,
                 send_type: sendType,
-                scheduled_at: scheduledAt.toISOString(),
+                scheduled_at: toLocalISOString(scheduledAt),
                 sent: false,
                 user_id: user.id,
             })
@@ -76,7 +82,7 @@ export default function EnviarPage() {
             setContact(null)
             setMessage('')
             setFiles([])
-            setScheduledAt(() => { const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
+            setScheduledAt(nowPlus2())
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)
@@ -136,7 +142,6 @@ export default function EnviarPage() {
                             borderRadius: '10px', padding: '20px', textAlign: 'center',
                             cursor: 'pointer', background: 'var(--purple-dim)',
                         }}>
-                            {/* FIX: key força remount do input após cada seleção */}
                             <input
                                 key={files.length}
                                 type="file"

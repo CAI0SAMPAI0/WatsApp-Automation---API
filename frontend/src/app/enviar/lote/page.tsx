@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { ContactSearch } from '@/components/ContactSearch'
-import { SchedulePicker } from '@/components/SchedulePicker'
+import { SchedulePicker, toLocalISOString } from '@/components/SchedulePicker'
 import { supabase } from '@/lib/supabase'
 import { Contact, SendType, MessageFile } from '@/types'
 
@@ -12,6 +12,13 @@ interface BatchItem {
     sendType: SendType
     message: string
     files: File[]
+}
+
+const nowPlus2 = () => {
+    const d = new Date()
+    d.setMinutes(d.getMinutes() + 2)
+    d.setSeconds(0, 0)
+    return d
 }
 
 const newItem = (): BatchItem => ({
@@ -24,7 +31,7 @@ const newItem = (): BatchItem => ({
 
 export default function LotePage() {
     const [items, setItems] = useState<BatchItem[]>([newItem()])
-    const [scheduledAt, setScheduledAt] = useState<Date>(() => { if (typeof window === "undefined") return new Date(); const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
+    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus2)
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -56,7 +63,6 @@ export default function LotePage() {
         return { url: data.publicUrl, type: getFileType(file), name: file.name }
     }
 
-    // FIX: captura arquivos antes de resetar; usa functional update para evitar closure stale
     const handleFileChange = (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
         const selected = Array.from(e.target.files ?? [])
         e.target.value = ''
@@ -89,7 +95,7 @@ export default function LotePage() {
                     message: item.sendType !== 'file' ? item.message : undefined,
                     files: uploadedFiles.length > 0 ? uploadedFiles : null,
                     send_type: item.sendType,
-                    scheduled_at: scheduledAt.toISOString(),
+                    scheduled_at: toLocalISOString(scheduledAt),
                     sent: false,
                     user_id: user.id,
                 }
@@ -100,7 +106,7 @@ export default function LotePage() {
 
             setSuccess(true)
             setItems([newItem()])
-            setScheduledAt(() => { const d = new Date(); d.setMinutes(d.getMinutes() + 2); d.setSeconds(0, 0); return d })
+            setScheduledAt(nowPlus2())
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)
@@ -196,7 +202,6 @@ export default function LotePage() {
                                         borderRadius: '10px', padding: '14px', textAlign: 'center',
                                         cursor: 'pointer', background: 'var(--purple-dim)',
                                     }}>
-                                        {/* FIX: key força remount após cada seleção */}
                                         <input
                                             key={item.files.length}
                                             type="file"
