@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { ContactSearch } from '@/components/ContactSearch'
-import { SchedulePicker, toLocalISOString } from '@/components/SchedulePicker'
+import { SchedulePicker, toLocalISOString, isScheduleValid } from '@/components/SchedulePicker'
 import { supabase } from '@/lib/supabase'
 import { Contact, SendType, MessageFile } from '@/types'
 
@@ -14,10 +14,10 @@ interface BatchItem {
     files: File[]
 }
 
-const nowPlus2 = () => {
+const nowPlus5 = () => {
     const d = new Date()
-    d.setMinutes(d.getMinutes() + 2)
     d.setSeconds(0, 0)
+    d.setMinutes(d.getMinutes() + 5)
     return d
 }
 
@@ -31,7 +31,7 @@ const newItem = (): BatchItem => ({
 
 export default function LotePage() {
     const [items, setItems] = useState<BatchItem[]>([newItem()])
-    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus2)
+    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus5)
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -80,6 +80,8 @@ export default function LotePage() {
             if (item.sendType === 'both' && (!item.message || item.files.length === 0)) return alert(`Preencha mensagem e arquivo para ${item.contact.name}`)
         }
 
+        if (!isScheduleValid(scheduledAt)) return alert('O horário deve ser pelo menos 1 minuto no futuro')
+
         setLoading(true)
         try {
             const { data: { user } } = await supabase.auth.getUser()
@@ -106,7 +108,7 @@ export default function LotePage() {
 
             setSuccess(true)
             setItems([newItem()])
-            setScheduledAt(nowPlus2())
+            setScheduledAt(nowPlus5())
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)

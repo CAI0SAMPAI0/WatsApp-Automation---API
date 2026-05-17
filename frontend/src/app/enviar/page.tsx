@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import { ContactSearch } from '@/components/ContactSearch'
-import { SchedulePicker, toLocalISOString } from '@/components/SchedulePicker'
+import { SchedulePicker, toLocalISOString, isScheduleValid } from '@/components/SchedulePicker'
 import { supabase } from '@/lib/supabase'
 import { Contact, SendType, MessageFile } from '@/types'
 
-const nowPlus2 = () => {
+const nowPlus5 = () => {
     const d = new Date()
-    d.setMinutes(d.getMinutes() + 2)
     d.setSeconds(0, 0)
+    d.setMinutes(d.getMinutes() + 5)
     return d
 }
 
@@ -18,7 +18,7 @@ export default function EnviarPage() {
     const [sendType, setSendType] = useState<SendType>('text')
     const [message, setMessage] = useState('')
     const [files, setFiles] = useState<File[]>([])
-    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus2)
+    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus5)
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -57,6 +57,7 @@ export default function EnviarPage() {
         if (sendType === 'text' && !message) return alert('Digite uma mensagem')
         if (sendType === 'file' && files.length === 0) return alert('Selecione um arquivo')
         if (sendType === 'both' && (!message || files.length === 0)) return alert('Preencha mensagem e arquivo')
+        if (!isScheduleValid(scheduledAt)) return alert('O horário deve ser pelo menos 1 minuto no futuro')
 
         setLoading(true)
         try {
@@ -82,7 +83,7 @@ export default function EnviarPage() {
             setContact(null)
             setMessage('')
             setFiles([])
-            setScheduledAt(nowPlus2())
+            setScheduledAt(nowPlus5())
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)

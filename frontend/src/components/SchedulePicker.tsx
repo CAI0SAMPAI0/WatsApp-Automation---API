@@ -15,8 +15,6 @@ const toDateStr = (d: Date) =>
 const toTimeStr = (d: Date) =>
     `${pad(d.getHours())}:${pad(d.getMinutes())}`
 
-// Serializa Date para ISO com offset local (ex: 2025-05-17T18:07:00-03:00)
-// Isso evita que .toISOString() converta para UTC e cause o deslocamento de 3h
 export const toLocalISOString = (d: Date): string => {
     const offset = -d.getTimezoneOffset()
     const sign = offset >= 0 ? '+' : '-'
@@ -26,15 +24,22 @@ export const toLocalISOString = (d: Date): string => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00${sign}${hh}:${mm}`
 }
 
-const nowPlus2 = (): Date => {
+/** Retorna data arredondada para o próximo minuto cheio + N minutos */
+const nowPlusMinutes = (n: number): Date => {
     const d = new Date()
-    d.setMinutes(d.getMinutes() + 2)
     d.setSeconds(0, 0)
+    d.setMinutes(d.getMinutes() + n)
     return d
+}
+
+/** Valida se a data escolhida é pelo menos 1 minuto no futuro */
+export const isScheduleValid = (d: Date): boolean => {
+    return d.getTime() > Date.now() + 60_000
 }
 
 export const SchedulePicker = ({ value, onChange }: Props) => {
     const [mounted, setMounted] = useState(false)
+    const [warning, setWarning] = useState('')
 
     useEffect(() => {
         setMounted(true)
@@ -45,6 +50,7 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
         const next = new Date(value)
         next.setFullYear(y, m - 1, d)
         onChange(next)
+        validate(next)
     }
 
     const handleTime = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +58,15 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
         const next = new Date(value)
         next.setHours(h, min, 0, 0)
         onChange(next)
+        validate(next)
+    }
+
+    const validate = (d: Date) => {
+        if (!isScheduleValid(d)) {
+            setWarning('⚠️ O horário deve ser pelo menos 1 minuto no futuro')
+        } else {
+            setWarning('')
+        }
     }
 
     if (!mounted) {
@@ -60,20 +75,23 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button
-                type="button"
-                onClick={() => onChange(nowPlus2())}
-                style={{
-                    alignSelf: 'flex-start',
-                    padding: '8px 18px', borderRadius: '8px', cursor: 'pointer',
-                    fontWeight: 600, fontSize: '13px', transition: 'all 0.2s',
-                    background: 'var(--surface-2)',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border)',
-                }}
-            >
-                ⚡ Agora (+2 min)
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {[5, 10, 30].map(n => (
+                    <button
+                        key={n}
+                        type="button"
+                        onClick={() => { const d = nowPlusMinutes(n); onChange(d); validate(d) }}
+                        style={{
+                            padding: '7px 14px', borderRadius: '8px', cursor: 'pointer',
+                            fontWeight: 600, fontSize: '12px', transition: 'all 0.2s',
+                            background: 'var(--surface-2)', color: 'var(--text-muted)',
+                            border: '1px solid var(--border)',
+                        }}
+                    >
+                        +{n} min
+                    </button>
+                ))}
+            </div>
 
             <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: '140px' }}>
@@ -96,15 +114,21 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
                 </div>
             </div>
 
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '-4px' }}>
-                🕐 Agendado para:{' '}
-                <strong style={{ color: 'var(--purple)' }}>
-                    {value.toLocaleString('pt-BR', {
-                        day: '2-digit', month: '2-digit', year: 'numeric',
-                        hour: '2-digit', minute: '2-digit',
-                    })}
-                </strong>
-            </p>
+            {warning ? (
+                <p style={{ fontSize: '11px', color: 'var(--danger)', marginTop: '-4px' }}>
+                    {warning}
+                </p>
+            ) : (
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '-4px' }}>
+                    🕐 Agendado para:{' '}
+                    <strong style={{ color: 'var(--purple)' }}>
+                        {value.toLocaleString('pt-BR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                        })}
+                    </strong>
+                </p>
+            )}
         </div>
     )
 }
