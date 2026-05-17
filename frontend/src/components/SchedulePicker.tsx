@@ -77,7 +77,7 @@ export const SchedulePicker = ({ value, onChange }: Props) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {[5, 10, 30].map(n => (
+                {[2, 5, 10, 15, 30].map(n => (
                     <button
                         key={n}
                         type="button"

@@ -25,12 +25,14 @@ const getStatus = (msg: Message) => {
     return { label: '⏳ Agendado', color: 'var(--purple)', bg: 'var(--purple-dim)', border: 'var(--purple-light)' }
 }
 
-const formatDate = (iso: string) =>
-    new Date(iso).toLocaleString('pt-BR', {
+const formatDate = (iso: string) => {
+    const raw = iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : iso + 'Z'
+    return new Date(raw).toLocaleString('pt-BR', {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
         timeZone: 'America/Sao_Paulo',
     })
+}
 
 export default function HistoricoPage() {
     const [messages, setMessages] = useState<Message[]>([])

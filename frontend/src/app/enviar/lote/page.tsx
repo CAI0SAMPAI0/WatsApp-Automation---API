@@ -14,10 +14,10 @@ interface BatchItem {
     files: File[]
 }
 
-const nowPlus5 = () => {
+const nowPlus2 = () => {
     const d = new Date()
     d.setSeconds(0, 0)
-    d.setMinutes(d.getMinutes() + 5)
+    d.setMinutes(d.getMinutes() + 2)
     return d
 }
 
@@ -31,7 +31,7 @@ const newItem = (): BatchItem => ({
 
 export default function LotePage() {
     const [items, setItems] = useState<BatchItem[]>([newItem()])
-    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus5)
+    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus2)
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -108,7 +108,7 @@ export default function LotePage() {
 
             setSuccess(true)
             setItems([newItem()])
-            setScheduledAt(nowPlus5())
+            setScheduledAt(nowPlus2())
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)

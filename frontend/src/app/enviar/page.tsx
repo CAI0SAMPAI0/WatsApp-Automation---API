@@ -6,10 +6,10 @@ import { SchedulePicker, toLocalISOString, isScheduleValid } from '@/components/
 import { supabase } from '@/lib/supabase'
 import { Contact, SendType, MessageFile } from '@/types'
 
-const nowPlus5 = () => {
+const nowPlus2 = () => {
     const d = new Date()
     d.setSeconds(0, 0)
-    d.setMinutes(d.getMinutes() + 5)
+    d.setMinutes(d.getMinutes() + 2)
     return d
 }
 
@@ -18,7 +18,7 @@ export default function EnviarPage() {
     const [sendType, setSendType] = useState<SendType>('text')
     const [message, setMessage] = useState('')
     const [files, setFiles] = useState<File[]>([])
-    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus5)
+    const [scheduledAt, setScheduledAt] = useState<Date>(nowPlus2)
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
@@ -83,7 +83,7 @@ export default function EnviarPage() {
             setContact(null)
             setMessage('')
             setFiles([])
-            setScheduledAt(nowPlus5())
+            setScheduledAt(nowPlus2())
             setTimeout(() => setSuccess(false), 4000)
         } catch (err: unknown) {
             alert('Erro: ' + (err as Error).message)
