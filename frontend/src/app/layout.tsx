@@ -4,8 +4,12 @@ import { Navbar } from '@/components/Navbar'
 import { AuthGuard } from '@/components/AuthGuard'
 
 export const metadata: Metadata = {
-  title: "Taty's English — Painel",
+  title: "Study Practices",
   description: 'Painel de envio de mensagens WhatsApp',
+  icons: {
+    icon: '/tati_logo.png',
+    apple: '/tati_logo.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

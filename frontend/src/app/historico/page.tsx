@@ -3,6 +3,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { SchedulePicker, toLocalISOString } from '@/components/SchedulePicker'
+import { ContactSearch } from '@/components/ContactSearch'
+import { Contact, SendType } from '@/types'
 
 interface Message {
     id: string
@@ -37,6 +39,9 @@ export default function HistoricoPage() {
     const [editingMsg, setEditingMsg] = useState<Message | null>(null)
     const [editMessage, setEditMessage] = useState('')
     const [editDate, setEditDate] = useState<Date>(new Date())
+    const [editContact, setEditContact] = useState<Contact | null>(null)
+    const [editSendType, setEditSendType] = useState<SendType>('text')
+    const [editFiles, setEditFiles] = useState<File[]>([])
     const [saving, setSaving] = useState(false)
     const userIdRef = useRef<string | null>(null)
 
@@ -79,7 +84,15 @@ export default function HistoricoPage() {
                         table: 'scheduled_messages',
                         filter: `user_id=eq.${user.id}`,
                     },
-                    () => { load(user.id) }
+                    (payload) => {
+                        if (payload.eventType === 'DELETE') {
+                            setMessages(prev => prev.filter(m => m.id !== payload.old.id))
+                        } else if (payload.eventType === 'INSERT') {
+                            setMessages(prev => [payload.new as Message, ...prev])
+                        } else if (payload.eventType === 'UPDATE') {
+                            setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new as Message : m))
+                        }
+                    }
                 )
                 .subscribe()
         }
@@ -92,27 +105,77 @@ export default function HistoricoPage() {
         setEditingMsg(msg)
         setEditMessage(msg.message || '')
         setEditDate(new Date(msg.scheduled_at))
+        setEditSendType(msg.send_type as SendType)
+        setEditFiles([])
+        setEditContact(null)
     }
 
     const closeEdit = () => {
         setEditingMsg(null)
         setEditMessage('')
         setEditDate(new Date())
+        setEditContact(null)
+        setEditSendType('text')
+        setEditFiles([])
+    }
+
+    const getFileType = (file: File): string => {
+        const mime = file.type
+        const ext = file.name.split('.').pop()?.toLowerCase()
+        if (mime.startsWith('image/')) return 'image'
+        if (mime.startsWith('audio/')) return 'audio'
+        if (mime.startsWith('video/')) return 'video'
+        if (mime.includes('pdf')) return 'pdf'
+        if (ext === 'pptx' || ext === 'ppt') return 'pptx'
+        if (ext === 'docx' || ext === 'doc') return 'docx'
+        if (ext === 'xlsx' || ext === 'xls') return 'xlsx'
+        return 'document'
+    }
+
+    const uploadFile = async (file: File): Promise<{ url: string; type: string; name: string }> => {
+        const path = `uploads/${Date.now()}-${file.name}`
+        const { error } = await supabase.storage.from('message-files')
+            .upload(path, file, { contentType: file.type })
+        if (error) throw new Error('Upload falhou: ' + error.message)
+        const { data } = supabase.storage.from('message-files').getPublicUrl(path)
+        return { url: data.publicUrl, type: getFileType(file), name: file.name }
     }
 
     const updateMessage = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!editingMsg) return
+
+        if (editSendType === 'text' && !editMessage.trim()) return alert('Digite uma mensagem')
+        if (editSendType === 'file' && editFiles.length === 0 && !editingMsg.files?.length) return alert('Selecione pelo menos um arquivo')
+        if (editSendType === 'both' && !editMessage.trim()) return alert('Digite uma mensagem')
+
         setSaving(true)
         try {
+            let uploadedFiles = editingMsg.files ?? []
+            if (editFiles.length > 0) {
+                uploadedFiles = await Promise.all(editFiles.map(uploadFile))
+            }
+
             const updates: Record<string, unknown> = {
                 scheduled_at: toLocalISOString(editDate),
+                send_type: editSendType,
+                sent: false,
             }
-            if (editingMsg.send_type !== 'file') {
+
+            if (editContact) {
+                updates.contact_jid = editContact.jid
+            }
+
+            if (editSendType !== 'file') {
                 updates.message = editMessage
+            } else {
+                updates.message = null
             }
-            if (editingMsg.sent) {
-                updates.sent = false
+
+            if (editSendType !== 'text' && uploadedFiles.length > 0) {
+                updates.files = uploadedFiles
+            } else if (editSendType === 'text') {
+                updates.files = null
             }
 
             const { error } = await supabase
@@ -133,14 +196,26 @@ export default function HistoricoPage() {
         if (!confirm('Deseja remover esta mensagem?')) return
         try {
             if (batch_id) {
-                await supabase.from('scheduled_messages').delete().eq('batch_id', batch_id)
+                const { error } = await supabase.from('scheduled_messages').delete().eq('batch_id', batch_id)
+                if (!error) {
+                    setMessages(prev => prev.filter(m => m.batch_id !== batch_id))
+                }
             } else {
-                await supabase.from('scheduled_messages').delete().eq('id', id)
+                const { error } = await supabase.from('scheduled_messages').delete().eq('id', id)
+                if (!error) {
+                    setMessages(prev => prev.filter(m => m.id !== id))
+                }
             }
         } catch (err: unknown) {
             alert('Erro ao remover: ' + (err as Error).message)
         }
     }
+
+    const filteredMessages = messages.filter(msg => {
+        if (filter === 'sent') return msg.sent
+        if (filter === 'pending') return !msg.sent
+        return true
+    })
 
     return (
         <div style={{ maxWidth: '720px', margin: '0 auto', padding: '16px' }}>
@@ -153,7 +228,7 @@ export default function HistoricoPage() {
                         Histórico
                     </h1>
                     <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-                        {messages.length} mensagem(ns) • atualização em tempo real
+                        {filteredMessages.length} mensagem(ns) • atualização em tempo real
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -174,13 +249,13 @@ export default function HistoricoPage() {
                 <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
                     Carregando...
                 </p>
-            ) : messages.length === 0 ? (
+            ) : filteredMessages.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '40px' }}>
                     Nenhuma mensagem encontrada.
                 </p>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    {messages.map((msg) => {
+                    {filteredMessages.map((msg) => {
                         const status = getStatus(msg)
                         return (
                             <div key={msg.id} style={{
@@ -252,7 +327,7 @@ export default function HistoricoPage() {
                         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
                         background: 'rgba(0,0,0,0.55)', display: 'flex',
                         alignItems: 'center', justifyContent: 'center',
-                        padding: '16px', zIndex: 1000,
+                        padding: '16px', zIndex: 1000, overflowY: 'auto',
                     }}
                     onClick={(e) => { if (e.target === e.currentTarget) closeEdit() }}
                 >
@@ -261,9 +336,10 @@ export default function HistoricoPage() {
                         onClick={(e) => e.stopPropagation()}
                         style={{
                             background: 'var(--surface)', padding: '28px',
-                            borderRadius: '16px', width: '100%', maxWidth: '480px',
-                            display: 'flex', flexDirection: 'column', gap: '16px',
+                            borderRadius: '16px', width: '100%', maxWidth: '520px',
+                            display: 'flex', flexDirection: 'column', gap: '18px',
                             boxShadow: 'var(--shadow-lg)',
+                            margin: 'auto',
                         }}
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -273,7 +349,7 @@ export default function HistoricoPage() {
                                 </h2>
                                 {editingMsg.sent && (
                                     <p style={{ fontSize: '12px', color: 'var(--warning)', marginTop: '4px' }}>
-                                        ⚠️ Será marcada como não enviada e reenviada no horário escolhido
+                                        ⚠️ Será reenviada no horário escolhido
                                     </p>
                                 )}
                             </div>
@@ -282,14 +358,50 @@ export default function HistoricoPage() {
                                 onClick={closeEdit}
                                 style={{
                                     background: 'none', border: 'none', cursor: 'pointer',
-                                    fontSize: '20px', color: 'var(--text-muted)', lineHeight: 1,
+                                    fontSize: '22px', color: 'var(--text-muted)', lineHeight: 1,
                                 }}
                             >
                                 ×
                             </button>
                         </div>
 
-                        {editingMsg.send_type !== 'file' && (
+                        <div>
+                            <label style={labelStyle}>Grupo destinatário</label>
+                            <ContactSearch
+                                selected={editContact}
+                                onSelect={setEditContact}
+                                placeholder={`Atual: ${editingMsg.contact_jid}`}
+                            />
+                            {!editContact && (
+                                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                                    Deixe em branco para manter o grupo atual
+                                </p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label style={labelStyle}>Tipo de envio</label>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {(['text', 'file', 'both'] as SendType[]).map((t) => (
+                                    <button
+                                        key={t}
+                                        type="button"
+                                        onClick={() => setEditSendType(t)}
+                                        style={{
+                                            padding: '8px 16px', borderRadius: '8px', cursor: 'pointer',
+                                            fontWeight: 600, fontSize: '12px', transition: 'all 0.2s',
+                                            background: editSendType === t ? 'var(--purple)' : 'var(--surface-2)',
+                                            color: editSendType === t ? '#fff' : 'var(--text-muted)',
+                                            border: `1px solid ${editSendType === t ? 'var(--purple)' : 'var(--border)'}`,
+                                        }}
+                                    >
+                                        {{ text: '💬 Texto', file: '📎 Arquivo', both: '✉️ Ambos' }[t]}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {(editSendType === 'text' || editSendType === 'both') && (
                             <div>
                                 <label style={labelStyle}>Mensagem</label>
                                 <textarea
@@ -303,6 +415,62 @@ export default function HistoricoPage() {
                                         resize: 'vertical', outline: 'none',
                                     }}
                                 />
+                            </div>
+                        )}
+
+                        {(editSendType === 'file' || editSendType === 'both') && (
+                            <div>
+                                <label style={labelStyle}>
+                                    Arquivos {editFiles.length > 0 ? `(${editFiles.length} novo(s))` : editingMsg.files?.length ? `(${editingMsg.files.length} atual(is))` : ''}
+                                </label>
+                                {editingMsg.files && editingMsg.files.length > 0 && editFiles.length === 0 && (
+                                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                                        Arquivos atuais serão mantidos. Selecione novos para substituir.
+                                    </p>
+                                )}
+                                <label style={{
+                                    display: 'block', border: '2px dashed var(--purple-light)',
+                                    borderRadius: '10px', padding: '14px', textAlign: 'center',
+                                    cursor: 'pointer', background: 'var(--purple-dim)',
+                                }}>
+                                    <input
+                                        key={editFiles.length}
+                                        type="file"
+                                        multiple
+                                        style={{ display: 'none' }}
+                                        onChange={(e) => {
+                                            const selected = Array.from(e.target.files ?? [])
+                                            if (selected.length > 0) setEditFiles(prev => [...prev, ...selected])
+                                            e.target.value = ''
+                                        }}
+                                    />
+                                    <p style={{ color: 'var(--purple)', fontWeight: 600, fontSize: '13px' }}>
+                                        Clique para selecionar arquivos
+                                    </p>
+                                </label>
+                                {editFiles.length > 0 && (
+                                    <ul style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        {editFiles.map((f, i) => (
+                                            <li key={`${f.name}-${i}`} style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                background: 'var(--surface-2)', borderRadius: '6px',
+                                                padding: '6px 12px', fontSize: '12px',
+                                            }}>
+                                                <span>📄 {f.name}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditFiles(prev => prev.filter((_, j) => j !== i))}
+                                                    style={{
+                                                        color: 'var(--danger)', background: 'none',
+                                                        border: 'none', cursor: 'pointer', fontSize: '11px',
+                                                    }}
+                                                >
+                                                    remover
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
                         )}
 
