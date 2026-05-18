@@ -100,7 +100,7 @@ export default function EnviarPage() {
                     Enviar mensagem
                 </h1>
                 <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-                    Envie para um contato ou grupo específico
+                    Envie para um grupo específico
                 </p>
             </div>
 

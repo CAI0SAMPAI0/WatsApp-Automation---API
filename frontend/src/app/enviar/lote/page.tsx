@@ -158,7 +158,7 @@ export default function LotePage() {
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                             <div>
-                                <label style={labelStyle}>Contato ou grupo</label>
+                                <label style={labelStyle}>Grupo</label>
                                 <ContactSearch
                                     selected={item.contact}
                                     onSelect={(c) => update(item.id, { contact: c })}
