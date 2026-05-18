@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { SchedulePicker, toLocalISOString } from '@/components/SchedulePicker'
 import { ContactSearch } from '@/components/ContactSearch'
 import { Contact, SendType } from '@/types'
-
+import { uploadFile, getFileType } from '@/lib/uploadUtils'
 interface Message {
     id: string
     contact_jid: string
@@ -121,7 +121,7 @@ export default function HistoricoPage() {
         setEditFiles([])
     }
 
-    const getFileType = (file: File): string => {
+    /*const getFileType = (file: File): string => {
         const mime = file.type
         const ext = file.name.split('.').pop()?.toLowerCase()
         if (mime.startsWith('image/')) return 'image'
@@ -141,7 +141,7 @@ export default function HistoricoPage() {
         if (error) throw new Error('Upload falhou: ' + error.message)
         const { data } = supabase.storage.from('message-files').getPublicUrl(path)
         return { url: data.publicUrl, type: getFileType(file), name: file.name }
-    }
+    }*/
 
     const updateMessage = async (e: React.FormEvent) => {
         e.preventDefault()

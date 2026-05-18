@@ -5,6 +5,7 @@ import { ContactSearch } from '@/components/ContactSearch'
 import { SchedulePicker, toLocalISOString, isScheduleValid } from '@/components/SchedulePicker'
 import { supabase } from '@/lib/supabase'
 import { Contact, SendType, MessageFile } from '@/types'
+import { uploadFile, getFileType } from '@/lib/uploadUtils'
 
 interface BatchItem {
     id: string
@@ -41,7 +42,7 @@ export default function LotePage() {
     const remove = (id: string) =>
         setItems(prev => prev.filter(i => i.id !== id))
 
-    const getFileType = (file: File): string => {
+    /*const getFileType = (file: File): string => {
         const mime = file.type
         const ext = file.name.split('.').pop()?.toLowerCase()
         if (mime.startsWith('image/')) return 'image'
@@ -61,7 +62,7 @@ export default function LotePage() {
         if (error) throw new Error('Upload falhou: ' + error.message)
         const { data } = supabase.storage.from('message-files').getPublicUrl(path)
         return { url: data.publicUrl, type: getFileType(file), name: file.name }
-    }
+    }*/
 
     const handleFileChange = (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
         const selected = Array.from(e.target.files ?? [])

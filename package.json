@@ -30,6 +30,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "lucide-react": "^1.16.0",
     "qrcode": "^1.5.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"

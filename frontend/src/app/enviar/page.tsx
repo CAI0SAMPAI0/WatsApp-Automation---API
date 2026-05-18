@@ -5,6 +5,7 @@ import { ContactSearch } from '@/components/ContactSearch'
 import { SchedulePicker, toLocalISOString, isScheduleValid } from '@/components/SchedulePicker'
 import { supabase } from '@/lib/supabase'
 import { Contact, SendType, MessageFile } from '@/types'
+import { uploadFile, getFileType } from '@/lib/uploadUtils'
 
 const nowPlus2 = () => {
     const d = new Date()
@@ -22,7 +23,7 @@ export default function EnviarPage() {
     const [loading, setLoading] = useState(false)
     const [success, setSuccess] = useState(false)
 
-    const getFileType = (file: File): string => {
+    /*const getFileType = (file: File): string => {
         const mime = file.type
         const ext = file.name.split('.').pop()?.toLowerCase()
         if (mime.startsWith('image/')) return 'image'
@@ -42,7 +43,7 @@ export default function EnviarPage() {
         if (error) throw new Error('Erro ao fazer upload: ' + error.message)
         const { data: urlData } = supabase.storage.from('message-files').getPublicUrl(path)
         return { url: urlData.publicUrl, type: getFileType(file), name: file.name }
-    }
+    }*/
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selected = Array.from(e.target.files ?? [])

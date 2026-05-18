@@ -11,6 +11,8 @@ export default function CadastroPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -25,7 +27,6 @@ export default function CadastroPage() {
 
     const email = `${username.trim().toLowerCase()}@taty.local`
 
-    // Verifica se username já existe
     const { data: existing } = await supabase
       .from('user_profiles')
       .select('id')
@@ -90,20 +91,46 @@ export default function CadastroPage() {
 
           <div>
             <label style={labelStyle}>Senha</label>
-            <input type="password" value={password}
-              onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCadastro()}
-              placeholder="••••••••"
-              style={{ ...inputStyle, width: '100%' }} />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCadastro()}
+                placeholder="••••••••"
+                style={{ ...inputStyle, width: '100%', paddingRight: '44px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                style={eyeBtnStyle}
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showPassword ? <EyeOff /> : <Eye />}
+              </button>
+            </div>
           </div>
 
           <div>
             <label style={labelStyle}>Confirmar senha</label>
-            <input type="password" value={confirm}
-              onChange={e => setConfirm(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleCadastro()}
-              placeholder="••••••••"
-              style={{ ...inputStyle, width: '100%' }} />
+            <div style={{ position: 'relative' }}>
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCadastro()}
+                placeholder="••••••••"
+                style={{ ...inputStyle, width: '100%', paddingRight: '44px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirm(p => !p)}
+                style={eyeBtnStyle}
+                aria-label={showConfirm ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showConfirm ? <EyeOff /> : <Eye />}
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -138,6 +165,25 @@ export default function CadastroPage() {
   )
 }
 
+// Ícone olho aberto
+const Eye = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+// Ícone olho fechado
+const EyeOff = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+)
+
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: '12px', fontWeight: 600,
   color: 'var(--text-muted)', marginBottom: '6px',
@@ -149,4 +195,12 @@ const inputStyle: React.CSSProperties = {
   borderRadius: '10px', padding: '12px 16px', color: 'var(--text)',
   fontSize: '14px', outline: 'none',
   boxShadow: '0 1px 4px rgba(124,92,191,0.06)',
+}
+
+const eyeBtnStyle: React.CSSProperties = {
+  position: 'absolute', right: '12px', top: '50%',
+  transform: 'translateY(-50%)',
+  background: 'none', border: 'none', cursor: 'pointer',
+  padding: '4px', color: 'var(--text-muted)',
+  display: 'flex', alignItems: 'center',
 }
