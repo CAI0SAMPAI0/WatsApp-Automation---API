@@ -45,6 +45,7 @@ export default function HistoricoPage() {
     const [editSendType, setEditSendType] = useState<SendType>('text')
     const [editFiles, setEditFiles] = useState<File[]>([])
     const [saving, setSaving] = useState(false)
+    const [groupNames, setGroupNames] = useState<Record<string, string>>({})
     const userIdRef = useRef<string | null>(null)
 
     const load = useCallback(async (userId?: string) => {
@@ -52,6 +53,7 @@ export default function HistoricoPage() {
         if (!uid) return
         setLoading(true)
 
+        // Busca mensagens agendadas
         let query = supabase
             .from('scheduled_messages')
             .select('*')
@@ -64,6 +66,21 @@ export default function HistoricoPage() {
 
         const { data } = await query
         setMessages(data ?? [])
+
+        // Busca grupos para mapear os JIDs para nomes amigáveis
+        const { data: groupsData } = await supabase
+            .from('groups')
+            .select('jid, subject')
+            .eq('user_id', uid)
+
+        if (groupsData) {
+            const mapping: Record<string, string> = {}
+            groupsData.forEach(g => {
+                mapping[g.jid] = g.subject
+            })
+            setGroupNames(mapping)
+        }
+
         setLoading(false)
     }, [filter])
 
@@ -76,27 +93,29 @@ export default function HistoricoPage() {
             userIdRef.current = user.id
             await load(user.id)
 
-            channel = supabase
-                .channel('scheduled_messages_changes')
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: 'scheduled_messages',
-                        filter: `user_id=eq.${user.id}`,
-                    },
-                    (payload) => {
-                        if (payload.eventType === 'DELETE') {
-                            setMessages(prev => prev.filter(m => m.id !== payload.old.id))
-                        } else if (payload.eventType === 'INSERT') {
-                            setMessages(prev => [payload.new as Message, ...prev])
-                        } else if (payload.eventType === 'UPDATE') {
-                            setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new as Message : m))
+            const chan = supabase.channel('scheduled_messages_changes')
+            if (chan) {
+                channel = chan
+                    .on(
+                        'postgres_changes',
+                        {
+                            event: '*',
+                            schema: 'public',
+                            table: 'scheduled_messages',
+                            filter: `user_id=eq.${user.id}`,
+                        },
+                        (payload) => {
+                            if (payload.eventType === 'DELETE') {
+                                setMessages(prev => prev.filter(m => m.id !== payload.old.id))
+                            } else if (payload.eventType === 'INSERT') {
+                                setMessages(prev => [payload.new as Message, ...prev])
+                            } else if (payload.eventType === 'UPDATE') {
+                                setMessages(prev => prev.map(m => m.id === payload.new.id ? payload.new as Message : m))
+                            }
                         }
-                    }
-                )
-                .subscribe()
+                    )
+                channel.subscribe()
+            }
         }
 
         init()
@@ -106,7 +125,9 @@ export default function HistoricoPage() {
     const openEdit = (msg: Message) => {
         setEditingMsg(msg)
         setEditMessage(msg.message || '')
-        setEditDate(new Date(msg.scheduled_at))
+        const iso = msg.scheduled_at
+        const raw = iso.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(iso) ? iso : iso + 'Z'
+        setEditDate(new Date(raw))
         setEditSendType(msg.send_type as SendType)
         setEditFiles([])
         setEditContact(null)
@@ -277,6 +298,10 @@ export default function HistoricoPage() {
                                     </span>
                                 </div>
 
+                                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--purple)', marginBottom: '8px' }}>
+                                    👥 Grupo: {groupNames[msg.contact_jid] || msg.contact_jid}
+                                </div>
+
                                 {msg.message && (
                                     <p style={{
                                         fontSize: '14px', color: 'var(--text)',
@@ -372,7 +397,7 @@ export default function HistoricoPage() {
                             <ContactSearch
                                 selected={editContact}
                                 onSelect={setEditContact}
-                                placeholder={`Atual: ${editingMsg.contact_jid}`}
+                                placeholder={`Atual: ${groupNames[editingMsg.contact_jid] || editingMsg.contact_jid}`}
                             />
                             {!editContact && (
                                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>

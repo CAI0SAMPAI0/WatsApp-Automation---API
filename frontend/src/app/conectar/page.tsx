@@ -16,20 +16,20 @@ export default function ConectarPage() {
     const [userId, setUserId] = useState<string | null>(null)
 
     const check = useCallback(async () => {
-        if (!userId) {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-                setUserId(user.id)
-                await fetch(`${BOT_URL}/connect`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: user.id })
-                })
-            }
-            return
-        }
-
         try {
+            if (!userId) {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                    setUserId(user.id)
+                    await fetch(`${BOT_URL}/connect`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ user_id: user.id })
+                    })
+                }
+                return
+            }
+
             const res = await fetch(`${BOT_URL}/status?user_id=${userId}`)
             const data = await res.json()
 
@@ -47,9 +47,11 @@ export default function ConectarPage() {
                     setQrImage(img)
                 }
             }
-        } catch {
+        } catch (err) {
+            console.warn('Erro ao conectar ou obter status do bot:', err)
+        } finally {
+            setLoading(false)
         }
-        setLoading(false)
     }, [router, userId])
 
     useEffect(() => {
