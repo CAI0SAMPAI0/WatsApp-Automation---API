@@ -44,8 +44,6 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
         if (connection === 'open') {
             qrCodes.delete(userId)
             sessions.set(userId, socket)
-            console.log(`✅ Sessão aberta para: ${userId}`)
-            // Sincroniza grupos após conectar
             try {
                 await syncContacts(socket, userId)
             } catch (err) {
@@ -84,10 +82,6 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
     return socket
 }
 
-/**
- * Carrega todas as sessões salvas em disco ao iniciar o bot.
- * Isso garante que as mensagens continuam sendo enviadas mesmo sem o frontend aberto.
- */
 export const restoreAllSessions = async (): Promise<void> => {
     const base = process.env.RAILWAY_VOLUME_MOUNT_PATH || './'
     const authBase = path.join(base, 'auth')

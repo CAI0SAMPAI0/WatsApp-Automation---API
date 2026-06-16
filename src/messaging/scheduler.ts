@@ -5,24 +5,12 @@ import * as SessionManager from '../whatsapp/sessionManager.js'
 
 const processingIds = new Set<string>()
 
-/**
- * Parseia o scheduled_at vindo do Supabase de forma segura.
- * O Supabase retorna timestamptz sem o sufixo 'Z' em algumas versões
- * (ex: "2026-05-17T20:53:00" ao invés de "2026-05-17T20:53:00Z").
- * Sem o 'Z', new Date() interpreta como horário local do servidor,
- * causando envio imediato quando o servidor está em UTC mas o usuário
- * está em BRT (UTC-3).
- */
 const parseScheduledAt = (raw: string): Date => {
-    // Se já tem indicador de timezone (Z, +, ou - após o horário), usa direto
-    // Caso contrário, adiciona Z para forçar interpretação como UTC
     const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(raw)
     return new Date(hasTimezone ? raw : raw + 'Z')
 }
 
 export const startScheduler = (): void => {
-    console.log('Agendador iniciado...')
-
     setInterval(async () => {
         const now = new Date()
         const nowISO = now.toISOString()
