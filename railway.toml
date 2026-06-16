@@ -4,4 +4,4 @@ buildCommand = "npm install && npx tsc"
 
 [deploy]
 startCommand = "node --max-old-space-size=150 --gc-interval=100 dist/index.js"
-restartPolicyType = "on-failure"
+restartPolicyType = "ON_FAILURE"
