@@ -4,6 +4,7 @@ import * as SessionManager from '../whatsapp/sessionManager.js'
 import fs from 'fs'
 import path from 'path'
 import { supabase } from '../supabase/client.js'
+import { BufferJSON } from '@whiskeysockets/baileys'
 
 export const startServer = () => {
     const app = express()
@@ -37,51 +38,168 @@ export const startServer = () => {
     })
 
     app.get('/sessions', async (req, res) => {
+        try {
+            const { data: sessionFiles, error: sessionErr } = await supabase
+                .from('whatsapp_session_files')
+                .select('user_id, updated_at')
+
+            if (sessionErr) throw sessionErr
+
+            // Agrupa pelo último modified time do arquivo creds.json ou último arquivo modificado
+            const userActivityMap: Record<string, string> = {}
+            if (sessionFiles) {
+                sessionFiles.forEach(row => {
+                    const rowDate = new Date(row.updated_at)
+                    const existingDateStr = userActivityMap[row.user_id]
+                    if (!existingDateStr || rowDate > new Date(existingDateStr)) {
+                        userActivityMap[row.user_id] = row.updated_at
+                    }
+                })
+            }
+
+            const folders = Object.keys(userActivityMap)
+
+            // Buscar nomes dos usuários no banco de dados para cruzar os dados
+            let usernamesMap: Record<string, string> = {}
+            try {
+                const { data: profiles, error } = await supabase
+                    .from('user_profiles')
+                    .select('id, username')
+
+                if (!error && profiles) {
+                    profiles.forEach(p => {
+                        usernamesMap[p.id] = p.username
+                    })
+                }
+            } catch (dbErr) {
+                console.error('Erro ao buscar perfis no banco de dados:', dbErr)
+            }
+
+            const sessionList = folders.map(userId => {
+                const lastActivity = userActivityMap[userId]
+                const lastActivityDate = new Date(lastActivity)
+                
+                // Formatando data para o fuso horário de Brasília (UTC-3)
+                const lastActivityBRT = lastActivityDate.toLocaleString('pt-BR', {
+                    timeZone: 'America/Sao_Paulo'
+                })
+
+                return {
+                    userId,
+                    username: usernamesMap[userId] || 'desconhecido/inativo',
+                    connected: SessionManager.isConnected(userId),
+                    hasQR: !!SessionManager.getQR(userId),
+                    lastActivity: lastActivityBRT
+                }
+            })
+            
+            res.json(sessionList)
+        } catch (err) {
+            console.error('Erro ao buscar sessões:', err)
+            res.status(500).json({ error: 'Erro ao listar sessões' })
+        }
+    })
+
+    // Rota para exportar as sessões locais da Railway
+    app.get('/export-sessions', (req, res) => {
+        const secret = req.query.secret as string
+        if (!secret || secret !== process.env.SUPABASE_KEY) {
+            return res.status(401).json({ error: 'Não autorizado' })
+        }
+
         const base = process.env.RAILWAY_VOLUME_MOUNT_PATH || './'
         const authBase = path.join(base, 'auth')
+
         if (!fs.existsSync(authBase)) {
             return res.json([])
         }
-        
-        const folders = fs.readdirSync(authBase).filter(name => {
-            return fs.statSync(path.join(authBase, name)).isDirectory()
-        })
 
-        // Buscar nomes dos usuários no banco de dados para cruzar os dados
-        let usernamesMap: Record<string, string> = {}
+        const exportedFiles: { userId: string; filename: string; content: string }[] = []
+
         try {
-            const { data: profiles, error } = await supabase
-                .from('user_profiles')
-                .select('id, username')
-
-            if (!error && profiles) {
-                profiles.forEach(p => {
-                    usernamesMap[p.id] = p.username
-                })
-            }
-        } catch (dbErr) {
-            console.error('Erro ao buscar perfis no banco de dados:', dbErr)
-        }
-
-        const sessionList = folders.map(userId => {
-            const folderPath = path.join(authBase, userId)
-            const stats = fs.statSync(folderPath)
-            
-            // Formatando data para o fuso horário de Brasília (UTC-3)
-            const lastActivityBRT = stats.mtime.toLocaleString('pt-BR', {
-                timeZone: 'America/Sao_Paulo'
+            const userIds = fs.readdirSync(authBase).filter(name => {
+                return fs.statSync(path.join(authBase, name)).isDirectory()
             })
 
-            return {
-                userId,
-                username: usernamesMap[userId] || 'desconhecido/inativo',
-                connected: SessionManager.isConnected(userId),
-                hasQR: !!SessionManager.getQR(userId),
-                lastActivity: lastActivityBRT
+            for (const userId of userIds) {
+                const userFolder = path.join(authBase, userId)
+                const files = fs.readdirSync(userFolder).filter(f => f.endsWith('.json'))
+
+                for (const file of files) {
+                    const filePath = path.join(userFolder, file)
+                    const content = fs.readFileSync(filePath, 'utf-8')
+                    exportedFiles.push({
+                        userId,
+                        filename: file,
+                        content
+                    })
+                }
             }
-        })
-        
-        res.json(sessionList)
+
+            res.json(exportedFiles)
+        } catch (err: any) {
+            console.error('Erro ao exportar sessões:', err)
+            res.status(500).json({ error: 'Erro ao exportar: ' + err.message })
+        }
+    })
+
+    // Rota para a Hugging Face puxar as sessões do Railway
+    app.post('/import-sessions', async (req, res) => {
+        const { source_url } = req.body
+        if (!source_url) {
+            return res.status(400).json({ error: 'source_url é obrigatório' })
+        }
+
+        try {
+            const response = await fetch(`${source_url}/export-sessions?secret=${encodeURIComponent(process.env.SUPABASE_KEY!)}`)
+            if (!response.ok) {
+                const errText = await response.text()
+                return res.status(response.status).json({ error: `Erro ao exportar da Railway: ${errText}` })
+            }
+
+            const files = (await response.json()) as { userId: string; filename: string; content: string }[]
+            console.log(`[Import] Recebidos ${files.length} arquivos para importar.`)
+
+            let importedCount = 0
+            for (const file of files) {
+                try {
+                    const parsed = JSON.parse(file.content, BufferJSON.reviver)
+                    const content = JSON.stringify(parsed, BufferJSON.replacer)
+
+                    const { error } = await supabase
+                        .from('whatsapp_session_files')
+                        .upsert({
+                            user_id: file.userId,
+                            filename: file.filename,
+                            content,
+                            updated_at: new Date().toISOString()
+                        }, {
+                            onConflict: 'user_id,filename'
+                        })
+
+                    if (error) {
+                        console.error(`[Import] Erro ao gravar ${file.filename}:`, error.message)
+                    } else {
+                        importedCount++
+                    }
+                } catch (parseErr) {
+                    console.error(`[Import] Erro de processamento em ${file.filename}:`, parseErr)
+                }
+            }
+
+            // Forçar reconexão de todas as sessões importadas
+            await SessionManager.restoreAllSessions()
+
+            res.json({
+                success: true,
+                total_files: files.length,
+                imported_files: importedCount,
+                message: 'Importação concluída e sessões restauradas com sucesso!'
+            })
+        } catch (err: any) {
+            console.error('Erro ao importar sessões:', err)
+            res.status(500).json({ error: 'Erro na importação: ' + err.message })
+        }
     })
 
     app.post('/disconnect', async (req, res) => {
