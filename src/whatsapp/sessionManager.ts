@@ -156,6 +156,9 @@ export const restoreAllSessions = async (): Promise<void> => {
 export const getUserSession = (userId: string) => sessions.get(userId)
 export const getQR = (userId: string) => qrCodes.get(userId)
 export const isConnected = (userId: string) => sessions.get(userId)?.user !== undefined
+export const getActiveUserIds = (): string[] => {
+    return Array.from(sessions.keys()).filter(userId => isConnected(userId))
+}
 
 export const disconnectUserSession = async (userId: string) => {
     const timer = reconnectTimers.get(userId)

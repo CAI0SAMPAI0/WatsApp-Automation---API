@@ -11,7 +11,14 @@ const parseScheduledAt = (raw: string): Date => {
 }
 
 export const startScheduler = (): void => {
+    const intervalMs = process.env.SCHEDULER_INTERVAL_MS 
+        ? parseInt(process.env.SCHEDULER_INTERVAL_MS, 10) 
+        : 10000
+
     setInterval(async () => {
+        const activeUserIds = SessionManager.getActiveUserIds()
+        if (activeUserIds.length === 0) return
+
         const now = new Date()
         const nowISO = now.toISOString()
 
@@ -20,6 +27,7 @@ export const startScheduler = (): void => {
             .select('*')
             .eq('sent', false)
             .lte('scheduled_at', nowISO)
+            .in('user_id', activeUserIds)
 
         if (error) {
             console.error('Erro ao buscar mensagens agendadas:', error.message)
@@ -75,5 +83,5 @@ export const startScheduler = (): void => {
                 }
             })()
         }
-    }, 5000)
+    }, intervalMs)
 }
