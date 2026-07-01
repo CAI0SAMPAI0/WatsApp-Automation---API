@@ -5,6 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import { supabase } from '../supabase/client.js'
 import { BufferJSON } from '@whiskeysockets/baileys'
+import { processScheduledMessages } from '../messaging/scheduler.js'
 
 export const startServer = () => {
     const app = express()
@@ -13,15 +14,29 @@ export const startServer = () => {
     app.use(cors({ origin: '*' }))
     app.use(express.json())
 
-    app.get('/status', (req, res) => {
+    app.get('/status', async (req, res) => {
         const userId = req.query.user_id as string
         if (!userId) return res.status(400).json({ error: 'user_id required' })
-        res.json({ connected: SessionManager.isConnected(userId), hasQR: !!SessionManager.getQR(userId) })
+        
+        const connected = SessionManager.isConnected(userId)
+        if (connected) {
+            SessionManager.updateSessionActivity(userId)
+        } else {
+            const hasCreds = await SessionManager.hasStoredCredentials(userId)
+            if (hasCreds) {
+                console.log(`[API] Usuário ${userId} solicitou status e possui credenciais. Restaurando sessão em background...`)
+                SessionManager.createUserSession(userId).catch(err =>
+                    console.error(`[API] Erro ao restaurar sessão em background para ${userId}:`, err)
+                )
+            }
+        }
+        res.json({ connected, hasQR: !!SessionManager.getQR(userId) })
     })
 
     app.get('/qr', (req, res) => {
         const userId = req.query.user_id as string
         if (!userId) return res.status(400).json({ error: 'user_id required' })
+        SessionManager.updateSessionActivity(userId)
         res.json({ qr: SessionManager.getQR(userId) || null })
     })
 
@@ -31,6 +46,7 @@ export const startServer = () => {
         
         try {
             await SessionManager.createUserSession(user_id)
+            SessionManager.updateSessionActivity(user_id)
             res.json({ ok: true })
         } catch (err) {
             res.status(500).json({ error: 'Erro ao conectar' })
@@ -214,5 +230,21 @@ export const startServer = () => {
         }
     })
 
+    app.post('/process-queue', async (req, res) => {
+        const secret = req.query.secret as string || req.headers['x-api-secret'] as string
+        if (!secret || secret !== process.env.SUPABASE_KEY) {
+            return res.status(401).json({ error: 'Não autorizado' })
+        }
+
+        try {
+            console.log('[API] Executando processamento da fila de mensagens sob demanda...')
+            await processScheduledMessages()
+            res.json({ success: true })
+        } catch (err: any) {
+            console.error('[API] Erro ao processar fila de mensagens:', err)
+            res.status(500).json({ error: err.message || 'Erro interno' })
+        }
+    })
+ 
     app.listen(PORT, () => console.log(`API rodando na porta ${PORT}`))
 }

@@ -9,6 +9,9 @@ import { supabase } from '../supabase/client.js'
 const sessions = new Map<string, WASocket>()
 const qrCodes = new Map<string, string>()
 const reconnectTimers = new Map<string, NodeJS.Timeout>()
+const lastActiveTimes = new Map<string, number>()
+const connectingPromises = new Map<string, Promise<WASocket>>()
+const idleDisconnectedUsers = new Set<string>()
 
 const getAuthFolder = (userId: string) => {
     const base = process.env.RAILWAY_VOLUME_MOUNT_PATH || './'
@@ -46,6 +49,7 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
         if (connection === 'open') {
             qrCodes.delete(userId)
             sessions.set(userId, socket)
+            lastActiveTimes.set(userId, Date.now())
             try {
                 await syncContacts(socket, userId)
             } catch (err) {
@@ -54,12 +58,23 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
         }
 
         if (connection === 'close') {
+            const isIdleDisc = idleDisconnectedUsers.has(userId)
+            if (isIdleDisc) {
+                idleDisconnectedUsers.delete(userId)
+                console.log(`Conexão fechada por ociosidade para ${userId}. Não reconectando.`)
+                sessions.delete(userId)
+                lastActiveTimes.delete(userId)
+                qrCodes.delete(userId)
+                return
+            }
+
             const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut
 
             console.log(`Conexão fechada para ${userId}. Código: ${statusCode}. Reconectar: ${shouldReconnect}`)
 
             sessions.delete(userId)
+            lastActiveTimes.delete(userId)
 
             if (shouldReconnect) {
                 const delay = 5000
@@ -160,6 +175,74 @@ export const getActiveUserIds = (): string[] => {
     return Array.from(sessions.keys()).filter(userId => isConnected(userId))
 }
 
+export const updateSessionActivity = (userId: string) => {
+    lastActiveTimes.set(userId, Date.now())
+}
+
+export const hasStoredCredentials = async (userId: string): Promise<boolean> => {
+    try {
+        const { data, error } = await supabase
+            .from('whatsapp_session_files')
+            .select('user_id')
+            .eq('user_id', userId)
+            .eq('filename', 'creds.json')
+            .maybeSingle()
+
+        if (error) {
+            console.error(`[SessionManager] Erro ao verificar credenciais de ${userId}:`, error.message)
+            return false
+        }
+        return !!data
+    } catch (err) {
+        console.error(`[SessionManager] Falha ao verificar credenciais de ${userId}:`, err)
+        return false
+    }
+}
+
+export const getOrRestoreSession = async (userId: string, timeoutMs = 20000): Promise<WASocket> => {
+    if (isConnected(userId)) {
+        updateSessionActivity(userId)
+        const sock = getUserSession(userId)
+        if (sock) return sock
+    }
+
+    let promise = connectingPromises.get(userId)
+    if (!promise) {
+        promise = new Promise<WASocket>(async (resolve, reject) => {
+            try {
+                console.log(`[SessionManager] Restaurando sessão sob demanda para o usuário ${userId}...`)
+                await createUserSession(userId)
+                
+                const checkInterval = setInterval(() => {
+                    if (isConnected(userId)) {
+                        clearInterval(checkInterval)
+                        connectingPromises.delete(userId)
+                        const sock = getUserSession(userId)
+                        if (sock) {
+                            updateSessionActivity(userId)
+                            resolve(sock)
+                        } else {
+                            reject(new Error('Sessão desconectada durante inicialização'))
+                        }
+                    }
+                }, 500)
+
+                setTimeout(() => {
+                    clearInterval(checkInterval)
+                    connectingPromises.delete(userId)
+                    reject(new Error('Timeout ao conectar sessão do WhatsApp'))
+                }, timeoutMs)
+            } catch (err) {
+                connectingPromises.delete(userId)
+                reject(err)
+            }
+        })
+        connectingPromises.set(userId, promise)
+    }
+
+    return promise
+}
+
 export const disconnectUserSession = async (userId: string) => {
     const timer = reconnectTimers.get(userId)
     if (timer) {
@@ -171,6 +254,8 @@ export const disconnectUserSession = async (userId: string) => {
     if (socket) {
         await socket.end(undefined)
         sessions.delete(userId)
+        lastActiveTimes.delete(userId)
+        qrCodes.delete(userId)
     }
 
     // Deletar da tabela do Supabase
@@ -178,4 +263,37 @@ export const disconnectUserSession = async (userId: string) => {
 
     const folder = getAuthFolder(userId)
     if (fs.existsSync(folder)) fs.rmSync(folder, { recursive: true, force: true })
-}
+}
+
+// Timer para limpar conexões ociosas e economizar recursos
+setInterval(() => {
+    const idleTimeout = 2 * 60 * 1000 // 2 minutos de ociosidade
+    const now = Date.now()
+    for (const [userId, socket] of sessions.entries()) {
+        if (!isConnected(userId)) {
+            continue
+        }
+        
+        const lastActive = lastActiveTimes.get(userId) || 0
+        if (now - lastActive > idleTimeout) {
+            console.log(`[SessionManager] Sessão do usuário ${userId} inativa por mais de 2 minutos. Desconectando para economizar recursos...`)
+            
+            idleDisconnectedUsers.add(userId)
+            sessions.delete(userId)
+            qrCodes.delete(userId)
+            lastActiveTimes.delete(userId)
+            
+            const timer = reconnectTimers.get(userId)
+            if (timer) {
+                clearTimeout(timer)
+                reconnectTimers.delete(userId)
+            }
+            
+            try {
+                socket.end(undefined)
+            } catch (err) {
+                console.error(`Erro ao encerrar socket ocioso de ${userId}:`, err)
+            }
+        }
+    }
+}, 30000)

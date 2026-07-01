@@ -5,7 +5,15 @@ import { restoreAllSessions } from './whatsapp/sessionManager.js'
 
 const main = async () => {
     startServer()
-    await restoreAllSessions()
-    startScheduler()
+    
+    if (process.env.RESTORE_SESSIONS_ON_START === 'true') {
+        console.log('Restaurando sessões na inicialização por configuração...')
+        await restoreAllSessions()
+    }
+    
+    if (process.env.ENABLE_INTERNAL_SCHEDULER === 'true') {
+        console.log('Iniciando scheduler interno por configuração...')
+        startScheduler()
+    }
 }
 main()
