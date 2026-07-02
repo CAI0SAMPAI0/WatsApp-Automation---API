@@ -2,6 +2,7 @@ import { WASocket, DisconnectReason, ConnectionState, BufferJSON } from '@whiske
 import makeWASocket from '@whiskeysockets/baileys'
 import path from 'path'
 import fs from 'fs'
+import pino from 'pino'
 import { syncContacts } from './sync.js'
 import { useSupabaseAuthState } from '../supabase/authState.js'
 import { supabase } from '../supabase/client.js'
@@ -12,6 +13,7 @@ const reconnectTimers = new Map<string, NodeJS.Timeout>()
 const lastActiveTimes = new Map<string, number>()
 const connectingPromises = new Map<string, Promise<WASocket>>()
 const idleDisconnectedUsers = new Set<string>()
+const reconnectAttempts = new Map<string, number>()
 
 const getAuthFolder = (userId: string) => {
     const base = process.env.RAILWAY_VOLUME_MOUNT_PATH || './'
@@ -26,6 +28,18 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
         reconnectTimers.delete(userId)
     }
 
+    // Se já existe um socket ativo no map, fecha ele antes de criar um novo para evitar vazamento
+    const existingSocket = sessions.get(userId)
+    if (existingSocket) {
+        console.log(`[SessionManager] Fechando socket existente/anterior para o usuário ${userId} antes de iniciar novo...`)
+        try {
+            existingSocket.end(undefined)
+        } catch (err) {
+            console.error(`[SessionManager] Erro ao fechar socket existente de ${userId}:`, err)
+        }
+        sessions.delete(userId)
+    }
+
     const { state, saveCreds } = await useSupabaseAuthState(userId)
 
     const socket = makeWASocket({
@@ -34,12 +48,20 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
         connectTimeoutMs: 30_000,
         keepAliveIntervalMs: 25_000,
         retryRequestDelayMs: 2000,
+        logger: pino({ level: 'error' }),
     })
 
     socket.ev.on('creds.update', saveCreds)
 
     socket.ev.on('connection.update', async (update: Partial<ConnectionState>) => {
         const { connection, lastDisconnect, qr } = update
+
+        // Evita que eventos de sockets antigos/sobrescritos interfiram na sessão atual
+        const isCurrentSocket = sessions.get(userId) === socket
+        const isIdleDisc = idleDisconnectedUsers.has(userId)
+        if (!isCurrentSocket && !isIdleDisc) {
+            return
+        }
 
         if (qr) {
             qrCodes.set(userId, qr)
@@ -50,6 +72,7 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
             qrCodes.delete(userId)
             sessions.set(userId, socket)
             lastActiveTimes.set(userId, Date.now())
+            reconnectAttempts.delete(userId)
             try {
                 await syncContacts(socket, userId)
             } catch (err) {
@@ -58,13 +81,13 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
         }
 
         if (connection === 'close') {
-            const isIdleDisc = idleDisconnectedUsers.has(userId)
             if (isIdleDisc) {
                 idleDisconnectedUsers.delete(userId)
                 console.log(`Conexão fechada por ociosidade para ${userId}. Não reconectando.`)
                 sessions.delete(userId)
                 lastActiveTimes.delete(userId)
                 qrCodes.delete(userId)
+                reconnectAttempts.delete(userId)
                 return
             }
 
@@ -77,8 +100,21 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
             lastActiveTimes.delete(userId)
 
             if (shouldReconnect) {
-                const delay = 5000
-                console.log(`Reconectando ${userId} em ${delay / 1000}s...`)
+                // Só reconecta se o usuário realmente já foi autenticado (possui credenciais com 'me')
+                const hasValidCreds = await hasStoredCredentials(userId)
+                if (!hasValidCreds) {
+                    console.log(`[SessionManager] Conexão fechada para ${userId}. Usuário não autenticado/pareado. Não reconectando.`)
+                    qrCodes.delete(userId)
+                    reconnectAttempts.delete(userId)
+                    return
+                }
+
+                const attempts = reconnectAttempts.get(userId) || 0
+                // Backoff exponencial: 5s, 10s, 20s, 40s, 80s, limite de 5 minutos (300000ms)
+                const delay = Math.min(5000 * Math.pow(2, attempts), 5 * 60 * 1000)
+                reconnectAttempts.set(userId, attempts + 1)
+
+                console.log(`Reconectando ${userId} em ${delay / 1000}s (tentativa ${attempts + 1})...`)
                 const timer = setTimeout(() => {
                     reconnectTimers.delete(userId)
                     createUserSession(userId).catch(err =>
@@ -89,6 +125,7 @@ export const createUserSession = async (userId: string): Promise<WASocket> => {
             } else {
                 // Usuário deslogou — remove credenciais
                 console.log(`Usuário ${userId} deslogou. Removendo credenciais do Supabase.`)
+                reconnectAttempts.delete(userId)
                 await supabase.from('whatsapp_session_files').delete().eq('user_id', userId)
 
                 const folder = getAuthFolder(userId)
@@ -142,20 +179,32 @@ export const restoreAllSessions = async (): Promise<void> => {
         }
     }
 
-    // 2. Restaurar a partir do Supabase
+    // 2. Restaurar a partir do Supabase (Apenas sessões ativas/autenticadas)
     try {
         const { data: sessionFiles, error } = await supabase
             .from('whatsapp_session_files')
-            .select('user_id')
+            .select('user_id, content')
             .eq('filename', 'creds.json')
 
         if (error) throw error
 
-        const userIds = Array.from(new Set(sessionFiles?.map(s => s.user_id) || []))
+        const activeUsers: string[] = []
+        if (sessionFiles) {
+            for (const file of sessionFiles) {
+                try {
+                    const parsed = JSON.parse(file.content)
+                    if (parsed?.me?.id) {
+                        activeUsers.push(file.user_id)
+                    }
+                } catch (e) {
+                    // Ignora JSON inválido
+                }
+            }
+        }
 
-        console.log(`Restaurando ${userIds.length} sessão(ões) salva(s) no Supabase...`)
+        console.log(`Restaurando ${activeUsers.length} sessão(ões) ativa(s) e pareada(s) no Supabase...`)
 
-        for (const userId of userIds) {
+        for (const userId of activeUsers) {
             try {
                 await createUserSession(userId)
                 console.log(`Sessão restaurada para: ${userId}`)
@@ -183,7 +232,7 @@ export const hasStoredCredentials = async (userId: string): Promise<boolean> => 
     try {
         const { data, error } = await supabase
             .from('whatsapp_session_files')
-            .select('user_id')
+            .select('content')
             .eq('user_id', userId)
             .eq('filename', 'creds.json')
             .maybeSingle()
@@ -192,7 +241,11 @@ export const hasStoredCredentials = async (userId: string): Promise<boolean> => 
             console.error(`[SessionManager] Erro ao verificar credenciais de ${userId}:`, error.message)
             return false
         }
-        return !!data
+        if (!data) return false
+
+        // Verifica se creds.json tem o campo 'me' (indica que o usuário realmente escaneou e pareou)
+        const parsed = JSON.parse(data.content)
+        return !!parsed?.me?.id
     } catch (err) {
         console.error(`[SessionManager] Falha ao verificar credenciais de ${userId}:`, err)
         return false
@@ -206,12 +259,18 @@ export const getOrRestoreSession = async (userId: string, timeoutMs = 20000): Pr
         if (sock) return sock
     }
 
+    const existingSocket = getUserSession(userId)
+
     let promise = connectingPromises.get(userId)
     if (!promise) {
         promise = new Promise<WASocket>(async (resolve, reject) => {
             try {
-                console.log(`[SessionManager] Restaurando sessão sob demanda para o usuário ${userId}...`)
-                await createUserSession(userId)
+                if (!existingSocket) {
+                    console.log(`[SessionManager] Restaurando sessão sob demanda para o usuário ${userId}...`)
+                    await createUserSession(userId)
+                } else {
+                    console.log(`[SessionManager] Sessão para o usuário ${userId} já está em inicialização. Aguardando conexão...`)
+                }
                 
                 const checkInterval = setInterval(() => {
                     if (isConnected(userId)) {

@@ -23,7 +23,8 @@ export const startServer = () => {
             SessionManager.updateSessionActivity(userId)
         } else {
             const hasCreds = await SessionManager.hasStoredCredentials(userId)
-            if (hasCreds) {
+            const isConnecting = !!SessionManager.getUserSession(userId)
+            if (hasCreds && !isConnecting) {
                 console.log(`[API] Usuário ${userId} solicitou status e possui credenciais. Restaurando sessão em background...`)
                 SessionManager.createUserSession(userId).catch(err =>
                     console.error(`[API] Erro ao restaurar sessão em background para ${userId}:`, err)
