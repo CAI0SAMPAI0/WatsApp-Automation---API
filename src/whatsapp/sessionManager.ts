@@ -289,6 +289,20 @@ export const getOrRestoreSession = async (userId: string, timeoutMs = 20000): Pr
                 setTimeout(() => {
                     clearInterval(checkInterval)
                     connectingPromises.delete(userId)
+                    
+                    // Encerra a conexão em caso de timeout para evitar sockets órfãos consumindo recursos
+                    const sock = getUserSession(userId)
+                    if (sock && !isConnected(userId)) {
+                        console.log(`[SessionManager] Timeout atingido para ${userId}. Encerrando socket para evitar vazamento.`)
+                        try {
+                            sock.end(undefined)
+                        } catch (err) {
+                            console.error(`[SessionManager] Erro ao fechar socket pós-timeout:`, err)
+                        }
+                        sessions.delete(userId)
+                        qrCodes.delete(userId)
+                    }
+                    
                     reject(new Error('Timeout ao conectar sessão do WhatsApp'))
                 }, timeoutMs)
             } catch (err) {
